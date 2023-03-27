@@ -85,13 +85,12 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'insta_world_db',
-        'USER': 'postgres',
-        'PASSWORD': 'root',
+        'USER': 'instaworld',
+        'PASSWORD': 'instaworld',
         'HOST': 'localhost',
         'PORT': 5432,
     }
 }
-
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -203,3 +202,19 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_WHITELIST = [
     'http://127.0.0.1:3000'
 ]
+
+os.environ['AWS_DEFAULT_REGION'] = 'us-west-2'
+
+account_sid = "AC11d5ef35bebdee85e7169fe4c36f6b1f"
+auth_token = "a1eeda7a6ae92d5775b9e498bc0117cb"
+verify_sid = "VA60f6c53bf39fce0a2fa6c7b736e6b083"
+verified_number = "+919625888984"
+twilio_phone_number = "+14752646809"
+
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_USE_TLS = True
+EMAIL_PORT = 587
+EMAIL_HOST_USER = 'mohd.asad@kiwitech.com'
+EMAIL_HOST_PASSWORD = '3339khanasad'

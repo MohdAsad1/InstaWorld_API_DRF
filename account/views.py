@@ -1,17 +1,27 @@
 from django.contrib.auth import authenticate
-from django.contrib.auth.models import User
-from rest_framework import status, serializers
+from rest_framework import serializers
 from rest_framework.authentication import BasicAuthentication
-from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, UpdateModelMixin, \
-    ListModelMixin
+from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, UpdateModelMixin, ListModelMixin
 from rest_framework.permissions import IsAdminUser
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework.viewsets import GenericViewSet
 
 from account.serializers import UserRegisterSerializer, UserLogInSerializer, UserChangePasswordSerializer, \
-    DeleteUserSerializer, UserSerializer
+    DeleteUserSerializer, ProfileSerializer
 from post.utils import get_tokens_for_user
+from django.contrib.auth.models import User
+from rest_framework import mixins, status
+from rest_framework.response import Response
+from rest_framework.viewsets import GenericViewSet
+from rest_framework import generics
+
+from .models import UserProfile
+from .serializers import PhoneOTPSerializer, VerifyOTPSerializer
+
+from .serializers import UserSerializer
+
+from rest_framework.views import APIView
+from .serializers import EmailOTPSerializer
+
 
 class UserRegister(GenericViewSet, CreateModelMixin):
     """View to register user"""
@@ -102,3 +112,39 @@ class UserView(GenericViewSet, ListModelMixin):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     # permission_classes = [IsAuthenticated]
+
+
+class ProfileAPI(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixin, mixins.RetrieveModelMixin,
+                 mixins.UpdateModelMixin, mixins.DestroyModelMixin):
+    serializer_class = ProfileSerializer
+    queryset = UserProfile.objects.all()
+
+
+class PhoneOTP(APIView):
+    serializer_class = PhoneOTPSerializer
+
+    def post(self, request):
+        serializer = PhoneOTPSerializer(data=request.data)
+        if serializer.is_valid():
+            data = serializer.save()
+            return Response(data)
+        return Response(serializer.errors, status=400)
+
+
+class VerifyOTPView(generics.GenericAPIView):
+    serializer_class = VerifyOTPSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response({'detail': 'OTP verified successfully'})
+
+
+class EmailOTP(APIView):
+    def post(self, request):
+        serializer = EmailOTPSerializer(data=request.data)
+        if serializer.is_valid():
+            data = serializer.save()
+            return Response(data)
+        return Response(serializer.errors, status=400)
+
