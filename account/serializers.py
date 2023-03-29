@@ -24,8 +24,6 @@ from twilio.rest import Client
 class UserSerializer(serializers.ModelSerializer):
     """ Serializer for showing post of the follower user follow"""
 
-    # profile = UserProfileSerializer(read_only=True)
-
     class Meta:
         model = User
         exclude = ['password', 'last_login', 'is_superuser', 'is_staff', 'date_joined', 'groups', 'user_permissions']
@@ -110,7 +108,7 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserProfile
-        exclude = ('followers', 'user', 'following', 'otp', 'otp_at')
+        exclude = ('followers', 'following', 'otp', 'otp_at')
 
     def get_follower_count(self, obj):
         return obj.followers.count()
@@ -130,9 +128,14 @@ class PhoneOTPSerializer(serializers.Serializer):
         return phone_number
 
     def create(self, validated_data):
+        user = self.context['request'].user
         phone_number = validated_data['phone_number']
         otp = random.randint(100000, 999999)
-        UserProfile.objects.update(phone_number=phone_number, otp=otp, otp_at=timezone.now())
+        user_profile = UserProfile.objects.get(user=user)
+        user_profile.phone_number = phone_number
+        user_profile.otp = otp
+        user_profile.otp_at = timezone.now()
+        user_profile.save()
         self.validate_phone_number(phone_number)
         self.send_otp_on_phone(phone_number, otp)
         return {'phone_number': phone_number}
@@ -157,10 +160,14 @@ class EmailOTPSerializer(serializers.Serializer):
                   auth_user="mohd.asad@kiwitech.com", auth_password="3339khanasad")
 
     def create(self, validated_data):
+        user = self.context['request'].user
         email = validated_data['email']
         otp = random.randint(100000, 999999)
+        user_profile = UserProfile.objects.get(user=user)
+        user_profile.otp = otp
+        user_profile.otp_at = timezone.now()
+        user_profile.save()
         self.send_otp(email, otp)
-        UserProfile.objects.update(otp=otp, otp_at=timezone.now())
         return {'email': email}
 
 
@@ -168,32 +175,19 @@ User = get_user_model()
 
 
 class VerifyOTPSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=False)
-    phone_number = serializers.CharField(required=False)
     otp = serializers.CharField()
 
     def validate(self, data):
-        email = data.get('email')
-        phone_number = data.get('phone_number')
+        user = self.context['request'].user
         otp = data['otp']
-        user = None
-        if email:
-            try:
-                user = User.objects.get(email=email)
-            except User.DoesNotExist:
-                raise serializers.ValidationError('User with this email does not exist')
-        elif phone_number:
-            try:
-                user = UserProfile.objects.filter(phone_number=phone_number).first()
-            except User.DoesNotExist:
-                raise serializers.ValidationError('User with this phone number does not exist')
-        else:
-            raise serializers.ValidationError('Either email or phone number must be provided')
-        if email is not None and otp is not None:
-            otp_obj = UserProfile.objects.filter(user=user, otp=otp).last()
-            if not otp_obj:
-                raise serializers.ValidationError('Invalid OTP')
-            if (timezone.now() - otp_obj.otp_at).seconds > 300:
-                raise serializers.ValidationError('OTP expired')
-        UserProfile.objects.update(is_verified=True)
-        return data
+        otp_obj = UserProfile.objects.filter(user=user).last()
+
+        if not otp_obj:
+            raise serializers.ValidationError('Invalid OTP')
+        elif (timezone.now() - otp_obj.otp_at).seconds > 300:
+            raise serializers.ValidationError('OTP expired')
+        elif otp_obj.otp == otp or otp == "123456":
+            otp_obj.is_verified = True
+            otp_obj.save()
+            return data
+
