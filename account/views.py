@@ -111,7 +111,6 @@ class UserView(GenericViewSet, ListModelMixin):
     """View to get post of the users followed by user"""
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    # permission_classes = [IsAuthenticated]
 
 
 class ProfileAPI(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixin, mixins.RetrieveModelMixin,
@@ -124,7 +123,7 @@ class PhoneOTP(APIView):
     serializer_class = PhoneOTPSerializer
 
     def post(self, request):
-        serializer = PhoneOTPSerializer(data=request.data)
+        serializer = PhoneOTPSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             data = serializer.save()
             return Response(data)
@@ -142,7 +141,7 @@ class VerifyOTPView(generics.GenericAPIView):
 
 class EmailOTP(APIView):
     def post(self, request):
-        serializer = EmailOTPSerializer(data=request.data)
+        serializer = EmailOTPSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             data = serializer.save()
             return Response(data)

@@ -15,6 +15,7 @@ class UserProfile(models.Model):
     otp_at = models.DateTimeField(blank=True, null=True)
     is_verified = models.BooleanField(default=False)
     phone_number = PhoneNumberField(max_length=20, blank=True, null=True)
+    date_of_birth = models.DateField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.bio}"
