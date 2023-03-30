@@ -7,7 +7,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from post.models import Post
 from post.serializers import PostSerializers, UserFollowersPostSerializer, PostSavedSerializer, PostListSerializer, \
-    PostLikeSerializer, PostSaveSerializer
+    PostLikeSerializer, PostSaveSerializer, PostCommentSerializer
 
 
 def get_tokens_for_user(user):
@@ -100,4 +100,14 @@ class PostSaveView(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         print(user)
         serializers = PostSaveSerializer(Post.objects.filter(saved_by__id=user), many=True)
         print(serializers)
+        return Response(serializers.data)
+
+
+class PostCommentView(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateModelMixin):
+    serializer_class = PostCommentSerializer
+    queryset = Post.objects.all()
+
+    def list(self, request, *args, **kwargs):
+        id = self.request.query_params.get('post_id')
+        serializers = PostCommentSerializer(Post.objects.filter(id=id), many=True)
         return Response(serializers.data)

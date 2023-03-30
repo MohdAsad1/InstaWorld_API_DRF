@@ -53,29 +53,21 @@ class PostSerializers(serializers.ModelSerializer):
     def create(self, validated_data):
         images_data = self.context.get('request').FILES.getlist('images', [])
         videos_data = self.context.get('request').FILES.getlist('videos', [])
-        comment_data = self.initial_data.getlist('comments', [])
 
         post = Post.objects.create(**validated_data, user=self.context['request'].user)
 
         images = []
         videos = []
-        comments = []
 
         for image_data in images_data:
-            img = Image.objects.create(image=image_data)
-            images.append(img)
+            image = Image.objects.create(image=image_data)
+            images.append(image)
         post.images.set(images)
 
         for video_data in videos_data:
-            vid = Video.objects.create(video=video_data)
-            videos.append(vid)
+            video = Video.objects.create(video=video_data)
+            videos.append(video)
         post.videos.set(videos)
-
-        for com_data in comment_data:
-            com = Comment.objects.create(text=com_data, user_id=self.context["request"].user.id)
-            comments.append(com)
-        post.comments.set(comments)
-        post.save()
 
         return post
 
@@ -133,30 +125,14 @@ class PostSaveSerializer(serializers.ModelSerializer):
         exclude = ['likes', 'comments', 'saved_by']
 
 
+class PostCommentSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    comment = serializers.SerializerMethodField()
 
-#utils
-import os
+    class Meta:
+        model = Post
+        fields = ('user', 'comment')
 
-from rest_framework_simplejwt.tokens import RefreshToken
-
-
-def user_upload_path(instance, filename):
-
-    username = instance.user.username
-    ext = filename.split('.')[-1]
-    if ext in ['jpg', 'jpeg', 'png', 'gif']:
-        folder = 'images'
-    elif ext in ['mp4', 'avi', 'mov', 'mkv']:
-        folder = 'videos'
-    else:
-        raise ValueError('Unsupported file format')
-    return os.path.join(username, folder, filename)
-
-
-def get_tokens_for_user(user):
-    refresh = RefreshToken.for_user(user)
-
-    return {
-        'refresh': str(refresh),
-        'access': str(refresh.access_token),
-    }
+    def get_comment(self, obj):
+        obj = obj.comments.values_list('comment', flat=True)
+        return obj
