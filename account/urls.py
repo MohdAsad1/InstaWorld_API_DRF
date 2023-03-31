@@ -18,7 +18,6 @@ router.register(r'profile', ProfileAPI, basename='profile')
 urlpatterns = [
     path('phone_otp/', PhoneOTP.as_view(), name='phone_otp'),
     path('verify_otp/', VerifyOTPView.as_view(), name='verify_otp'),
-    path('email_otp/', EmailOTP.as_view(), name='email_otp'),
     path('', include(router.urls))
 ]
 

@@ -10,17 +10,14 @@ from account.serializers import UserRegisterSerializer, UserLogInSerializer, Use
 from post.utils import get_tokens_for_user
 from django.contrib.auth.models import User
 from rest_framework import mixins, status
-from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
-from rest_framework import generics
-
+from rest_framework.response import Response
 from .models import UserProfile
 from .serializers import PhoneOTPSerializer, VerifyOTPSerializer
 
 from .serializers import UserSerializer
 
 from rest_framework.views import APIView
-from .serializers import EmailOTPSerializer
 
 
 class UserRegister(GenericViewSet, CreateModelMixin):
@@ -30,10 +27,10 @@ class UserRegister(GenericViewSet, CreateModelMixin):
     http_method_names = ['post']
 
     def create(self, request, *args, **kwargs):
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.serializer_class(data=request.data, context={'request': request})
         if serializer.is_valid(raise_exception=True):
             user = serializer.create(serializer.validated_data)
-            return Response({"message": "User created successfully"},
+            return Response({"message": "User created successfully and Otp is send to Email"},
                             status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -52,9 +49,9 @@ class UserLogIn(GenericViewSet, CreateModelMixin):
             username = request.data.get('username')
             password = request.data.get('password')
 
-            user = authenticate(username=username, password=password)
+            user = authenticate(username=username, password=password, is_active=True)
             if not user:
-                raise serializers.ValidationError("No such user found. Register First!")
+                raise serializers.ValidationError("No such user found. Register First! or Verify Your user")
             user_token = get_tokens_for_user(user)
 
             return Response({'token': user_token,
@@ -130,20 +127,11 @@ class PhoneOTP(APIView):
         return Response(serializer.errors, status=400)
 
 
-class VerifyOTPView(generics.GenericAPIView):
-    serializer_class = VerifyOTPSerializer
-
-    def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        return Response({'detail': 'OTP verified successfully'})
-
-
-class EmailOTP(APIView):
+class VerifyOTPView(APIView):
     def post(self, request):
-        serializer = EmailOTPSerializer(data=request.data, context={'request': request})
+        serializer = VerifyOTPSerializer(data=request.data)
         if serializer.is_valid():
-            data = serializer.save()
-            return Response(data)
-        return Response(serializer.errors, status=400)
-
+            serializer.save()
+            return Response({'message': 'OTP verified successfully and account activated!'},
+                            status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
