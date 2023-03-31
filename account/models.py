@@ -8,14 +8,14 @@ class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     image = models.ImageField(upload_to="img/", null=True, blank=True)
     bio = models.CharField(max_length=200, null=True, blank=True)
-    followers = models.ManyToManyField(User, related_name='followers')
-    following = models.ManyToManyField(User, related_name='following')
+    followers = models.ManyToManyField(User, related_name='followers', blank=True)
+    following = models.ManyToManyField(User, related_name='following', blank=True)
     created_on = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     otp = models.CharField(max_length=10, blank=True, null=True)
     otp_at = models.DateTimeField(blank=True, null=True)
-    is_verified = models.BooleanField(default=False)
     phone_number = PhoneNumberField(max_length=20, blank=True, null=True)
     date_of_birth = models.DateField(blank=True, null=True)
+    post_counts = models.CharField(max_length=50, null=True, blank=True)
 
     def __str__(self):
         return f"{self.bio}"
