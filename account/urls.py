@@ -13,6 +13,7 @@ router.register(r'login', views.UserLogIn, basename='login'),
 router.register(r'change-password', views.UserChangePassword, basename='change_password'),
 router.register(r'delete-user', views.DeleteUser, basename='delete_user'),
 router.register(r'user', views.UserView, basename='user'),
+router.register(r'search-user', views.UserSearchView, basename='search_user'),
 router.register(r'profile', ProfileAPI, basename='profile')
 router.register('get_followers_list', views.FollowerViewSet, basename='get_followers_list')
 router.register('get_following_list', views.FollowingViewSet, basename='get_following_list')

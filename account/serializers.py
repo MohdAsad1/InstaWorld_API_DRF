@@ -26,21 +26,52 @@ class UserSerializer(serializers.ModelSerializer):
 
 class UserRegisterSerializer(serializers.ModelSerializer):
     """Serializer to Register user"""
+    username = serializers.CharField(trim_whitespace=False)
+    first_name = serializers.CharField(max_length=20, min_length=3, required=True,
+                                       trim_whitespace=False)
+    last_name = serializers.CharField(max_length=20, min_length=3, required=True,
+                                      trim_whitespace=False)
+    email = serializers.EmailField(required=True)
+    password = serializers.CharField(max_length=20, min_length=8, required=True,
+                                     write_only=True, trim_whitespace=False)
+    confirm_password = serializers.CharField(max_length=20, min_length=8, required=True,
+                                             write_only=True)
+
     is_active = serializers.BooleanField(default=False)
-    first_name = serializers.CharField(max_length=20, min_length=3, required=True)
-    last_name = serializers.CharField(max_length=20, min_length=3, required=True)
-    email = serializers.EmailField(required=False)
-    password = serializers.CharField(max_length=20, min_length=8, required=True, write_only=True)
-    confirm_password = serializers.CharField(max_length=20, min_length=8, required=True, write_only=True)
 
     class Meta:
         model = User
         fields = ('id', 'username', 'password', 'first_name', 'is_active', 'last_name', 'email', 'confirm_password')
 
-    def validate_password(self, value):
-        regex1 = re.compile('[@_!#$%^&*()<>?/}{~:]')
-        if regex1.search(value) is None:
-            raise serializers.ValidationError("Password should contain special character!")
+    def validate_password(self, value, user=None):
+        regex = re.compile(r'^(?=.*[!@#$%^&*()_+\-=[\]{};:\'"\\|,.<>/?])(?=.*[A-Z])(?=.*[a-z])(?=.*\d)[^\s]{8,}$')
+        if not regex.match(value):
+            raise serializers.ValidationError("Password must contain at least one special character, one capital "
+                                              "letter, one small letter, and one number, with a length of at least 8 "
+                                              "and no spaces.")
+        return value
+
+    def validate_username(self, value):
+        if not value.isalnum() or ' ' in value:
+            raise serializers.ValidationError(" Username should contain alphanumeric value and spaces not allowed")
+        if not any(char.isalpha() for char in value):
+            raise serializers.ValidationError("Username should contain atleast one alphabet.")
+        return value
+
+    def validate_first_name(self, value):
+        """
+            Field level validation to validate first name
+        """
+        if not value.isalpha() or ' ' in value:
+            raise serializers.ValidationError("Invalid First name. Only Alphabets are allowed.")
+        return value
+
+    def validate_last_name(self, value):
+        """
+            Field level validation to validate last name
+        """
+        if not value.isalpha() or ' ' in value:
+            raise serializers.ValidationError("Invalid last name. Only Alphabets are allowed.")
         return value
 
     def validate(self, data):
@@ -105,6 +136,19 @@ class DeleteUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = '__all__'
+
+
+class UserSearchSerializer(serializers.ModelSerializer):
+    """
+    Serializer for showing post of the follower user follow
+    """
+    profile_pic = serializers.ImageField(source='userprofile.image', read_only=True)
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'profile_pic']
+        # exclude = ['password', 'last_login', 'is_superuser', 'is_staff', 'date_joined', 'groups', 'user_permissions']
+
 
 
 class ProfileSerializer(serializers.ModelSerializer):
