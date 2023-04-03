@@ -1,12 +1,14 @@
 from django.contrib.auth import authenticate
+from django.db.models import Q
 from rest_framework import serializers
 from rest_framework.authentication import BasicAuthentication
 from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, UpdateModelMixin, ListModelMixin
 from rest_framework.permissions import IsAdminUser
 from rest_framework.permissions import IsAuthenticated
+from django.contrib.auth.hashers import check_password
 
 from account.serializers import UserRegisterSerializer, UserLogInSerializer, UserChangePasswordSerializer, \
-    DeleteUserSerializer, ProfileSerializer, FollowingSerializer, FollowersSerializer
+    DeleteUserSerializer, ProfileSerializer, UserSearchSerializer,  FollowingSerializer, FollowersSerializer
 from post.utils import get_tokens_for_user
 from django.contrib.auth.models import User
 from rest_framework import mixins, status
@@ -30,8 +32,10 @@ class UserRegister(GenericViewSet, CreateModelMixin):
         serializer = self.serializer_class(data=request.data, context={'request': request})
         if serializer.is_valid(raise_exception=True):
             user = serializer.create(serializer.validated_data)
-            return Response({"message": "User created successfully and Otp is send to Email"},
-                            status=status.HTTP_201_CREATED)
+            user_token = get_tokens_for_user(user)
+            return Response({'token': user_token,
+                             "message": "User created successfully"}, status=status.HTTP_201_CREATED)
+           
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -41,23 +45,45 @@ class UserLogIn(GenericViewSet, CreateModelMixin):
     serializer_class = UserLogInSerializer
     http_method_names = ['post']
 
+    # def create(self, request, *args, **kwargs):
+    #
+    #     data = request.data
+    #     serializer = self.serializer_class(data=data)
+    #     if serializer.is_valid():
+    #         username = request.data.get('username')
+    #         password = request.data.get('password')
+    #
+    #         user = authenticate(username=username, password=password)
+    #         if not user:
+    #             raise serializers.ValidationError("No such user found. Register First!")
+    #         user_token = get_tokens_for_user(user)
+    #
+    #         return Response({'token': user_token,
+    #                          "data": serializer.data,
+    #                          'message': "Successfully Logged In",
+    #                          }, status=status.HTTP_200_OK)
+    #     return Response({
+    #         'data': serializer.errors}, status=status.HTTP_404_NOT_FOUND)
+
     def create(self, request, *args, **kwargs):
 
         data = request.data
         serializer = self.serializer_class(data=data)
         if serializer.is_valid():
-            username = request.data.get('username')
+            username_or_email = request.data.get('username')
             password = request.data.get('password')
-
-            user = authenticate(username=username, password=password, is_active=True)
+            user = User.objects.filter(Q(email=username_or_email) | Q(username=username_or_email)).first()
+            print(user)
+            # user = authenticate(**data)
             if not user:
-                raise serializers.ValidationError("No such user found. Register First! or Verify Your user")
-            user_token = get_tokens_for_user(user)
+                raise serializers.ValidationError("No such user found. Register First!")
+            if user.check_password(password):
+                user_token = get_tokens_for_user(user)
 
-            return Response({'token': user_token,
-                             "data": serializer.data,
-                             'message': "Successfully Logged In",
-                             }, status=status.HTTP_200_OK)
+                return Response({'token': user_token,
+                                 "data": serializer.data,
+                                 'message': "Successfully Logged In",
+                                 }, status=status.HTTP_200_OK)
         return Response({
             'data': serializer.errors}, status=status.HTTP_404_NOT_FOUND)
 
@@ -161,3 +187,18 @@ class VerifyOTPView(APIView):
             return Response({'message': 'OTP verified successfully and account activated!'},
                             status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UserSearchView(GenericViewSet):
+    serializer_class = UserSearchSerializer
+
+    def list(self, request, *args, **kwargs):
+        search = request.query_params.get('search')
+        if search:
+            queryset = User.objects.filter(Q(username__icontains=search) | Q(first_name__icontains=search) |
+                                           Q(last_name__icontains=search))
+        else:
+            return Response({"message": "No user found"})
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
