@@ -9,7 +9,6 @@ import sys
 sys.path.append("..")
 from .models import UserProfile
 
-
 import random
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -123,6 +122,30 @@ class ProfileSerializer(serializers.ModelSerializer):
         return obj.following.count()
 
 
+class FollowersSerializer(serializers.ModelSerializer):
+    followers = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserProfile
+        fields = ('followers',)
+
+    def get_followers(self, obj):
+        return [{'id': user.id, 'username': user.username, 'profile': {'profile_pic': str(user.userprofile.image)}}
+                for user in obj.followers.all()]
+
+
+class FollowingSerializer(serializers.ModelSerializer):
+    following = serializers.SerializerMethodField()
+
+    def get_following(self, obj):
+        return [{'id': user.id, 'username': user.username, 'profile': {'profile_pic': str(user.userprofile.image)}}
+                for user in obj.following.all()]
+
+    class Meta:
+        model = UserProfile
+        fields = ('following',)
+
+
 class PhoneOTPSerializer(serializers.Serializer):
     phone_number = serializers.CharField()
 
@@ -138,7 +161,6 @@ class PhoneOTPSerializer(serializers.Serializer):
         validate_phone_number(self, phone_number)
         send_otp_on_phone(self, phone_number, otp)
         return {'phone_number': phone_number}
-
 
 
 User = get_user_model()

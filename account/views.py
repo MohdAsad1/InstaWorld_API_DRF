@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAdminUser
 from rest_framework.permissions import IsAuthenticated
 
 from account.serializers import UserRegisterSerializer, UserLogInSerializer, UserChangePasswordSerializer, \
-    DeleteUserSerializer, ProfileSerializer
+    DeleteUserSerializer, ProfileSerializer, FollowingSerializer, FollowersSerializer
 from post.utils import get_tokens_for_user
 from django.contrib.auth.models import User
 from rest_framework import mixins, status
@@ -114,6 +114,32 @@ class ProfileAPI(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixin,
                  mixins.UpdateModelMixin, mixins.DestroyModelMixin):
     serializer_class = ProfileSerializer
     queryset = UserProfile.objects.all()
+
+
+class FollowerViewSet(GenericViewSet, ListModelMixin):
+    serializer_class = FollowersSerializer
+    queryset = UserProfile.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
+        profile = UserProfile.objects.get(user=request.user)
+        serializer = self.get_serializer(profile)
+        return Response(serializer.data)
+
+
+class FollowingViewSet(GenericViewSet, ListModelMixin):
+    serializer_class = FollowingSerializer
+    queryset = UserProfile.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
+        profile = UserProfile.objects.get(user=request.user)
+        serializer = self.get_serializer(profile)
+        return Response(serializer.data)
 
 
 class PhoneOTP(APIView):
