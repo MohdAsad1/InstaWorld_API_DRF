@@ -1,4 +1,4 @@
-from datetime import timezone
+from datetime import timezone, datetime
 from random import random
 
 from django.contrib.auth.models import User
@@ -31,7 +31,7 @@ class UserRegisterSerializer(serializers.ModelSerializer):
                                        trim_whitespace=False)
     last_name = serializers.CharField(max_length=20, min_length=3, required=True,
                                       trim_whitespace=False)
-    email = serializers.EmailField(required=True)
+
     password = serializers.CharField(max_length=20, min_length=8, required=True,
                                      write_only=True, trim_whitespace=False)
     confirm_password = serializers.CharField(max_length=20, min_length=8, required=True,
@@ -41,7 +41,7 @@ class UserRegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'password', 'first_name', 'is_active', 'last_name', 'email', 'confirm_password')
+        fields = ('id', 'username', 'password', 'first_name', 'is_active', 'last_name', 'confirm_password')
 
     def validate_password(self, value, user=None):
         regex = re.compile(r'^(?=.*[!@#$%^&*()_+\-=[\]{};:\'"\\|,.<>/?])(?=.*[A-Z])(?=.*[a-z])(?=.*\d)[^\s]{8,}$')
@@ -96,18 +96,11 @@ class UserRegisterSerializer(serializers.ModelSerializer):
             first_name=validated_data['first_name'],
             last_name=validated_data['last_name'],
             username=validated_data['username'],
-            email=validated_data['email'],
             password=validated_data['password'],
             is_active=validated_data['is_active']
         )
-        user = UserProfile.objects.create(user=user)
-        email = validated_data['email']
-        otp = random.randint(100000, 999999)
-        user.otp = otp
-        user.otp_at = timezone.now()
-        user.save()
-        send_otp(self, email, otp)
-        return user
+        user_profile = UserProfile.objects.create(user=user)
+        return user, user_profile
 
 
 class UserLogInSerializer(serializers.ModelSerializer):
@@ -150,7 +143,6 @@ class UserSearchSerializer(serializers.ModelSerializer):
         # exclude = ['password', 'last_login', 'is_superuser', 'is_staff', 'date_joined', 'groups', 'user_permissions']
 
 
-
 class ProfileSerializer(serializers.ModelSerializer):
     follower_count = serializers.SerializerMethodField()
     following_count = serializers.SerializerMethodField()
@@ -190,23 +182,6 @@ class FollowingSerializer(serializers.ModelSerializer):
         fields = ('following',)
 
 
-class PhoneOTPSerializer(serializers.Serializer):
-    phone_number = serializers.CharField()
-
-    def create(self, validated_data):
-        user = self.context['request'].user
-        phone_number = validated_data['phone_number']
-        otp = random.randint(100000, 999999)
-        user_profile = UserProfile.objects.get(user=user)
-        user_profile.phone_number = phone_number
-        user_profile.otp = otp
-        user_profile.otp_at = timezone.now()
-        user_profile.save()
-        validate_phone_number(self, phone_number)
-        send_otp_on_phone(self, phone_number, otp)
-        return {'phone_number': phone_number}
-
-
 User = get_user_model()
 
 
@@ -221,13 +196,53 @@ class VerifyOTPSerializer(serializers.Serializer):
             raise serializers.ValidationError('Invalid OTP')
         elif (timezone.now() - otp_obj.otp_at).seconds > 300:
             raise serializers.ValidationError('OTP expired')
-        elif otp_obj.otp == otp or otp == "123456":
+        elif otp_obj.otp == otp:
             user = otp_obj.user
             user.is_active = True
             user.save()
+            attrs['user'] = user
             return attrs
 
     def create(self, validated_data):
         otp = validated_data.get('otp')
+        user = validated_data.get('user')
         otp_obj = UserProfile.objects.filter(otp=otp).first()
         return otp_obj
+
+
+class UserProfileOTPSerializer(serializers.ModelSerializer):
+    date_of_birth = serializers.DateField(required=True)
+    phone_number = serializers.CharField(required=False)
+    email = serializers.EmailField(required=False)
+
+    class Meta:
+        model = UserProfile
+        fields = ('id', 'otp', 'otp_at', 'phone_number', 'email', 'date_of_birth')
+
+    def generate_otp(self, user_profile, validated_data):
+        date_of_birth = validated_data.get('date_of_birth')
+        email = validated_data.get('email')
+        phone_number = validated_data.get('phone_number')
+        user = user_profile.user
+        otp = str(random.randint(100000, 999999))
+
+        if phone_number:
+            validate_phone_number(self, phone_number)
+            send_otp_on_phone(self, phone_number, otp)
+            user_profile.phone_number = phone_number
+
+        if email:
+            user.email = email
+            user.save()
+            send_otp(self, email, otp)
+
+        user_profile.otp = otp
+        user_profile.otp_at = datetime.now()
+        user_profile.date_of_birth = date_of_birth
+        user_profile.save()
+        return otp
+
+    def validate(self, attrs):
+        if not attrs.get('phone_number') and not attrs.get('email'):
+            raise serializers.ValidationError("Either phone number or email is required")
+        return attrs

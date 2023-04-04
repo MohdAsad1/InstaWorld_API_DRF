@@ -4,7 +4,7 @@ from django.conf.urls.static import static
 from account import views
 from rest_framework.routers import DefaultRouter
 
-from account.views import PhoneOTP, VerifyOTPView, ProfileAPI
+from account.views import VerifyOTPView, ProfileAPI, GenerateOTPView
 
 router = DefaultRouter()
 
@@ -19,8 +19,8 @@ router.register('get_followers_list', views.FollowerViewSet, basename='get_follo
 router.register('get_following_list', views.FollowingViewSet, basename='get_following_list')
 
 urlpatterns = [
-    path('phone_otp/', PhoneOTP.as_view(), name='phone_otp'),
     path('verify_otp/', VerifyOTPView.as_view(), name='verify_otp'),
+    path('generate_otp/<int:pk>/', GenerateOTPView.as_view(), name='generate_otp'),
     path('', include(router.urls))
 ]
 
