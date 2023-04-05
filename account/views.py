@@ -39,9 +39,9 @@ class UserRegister(GenericViewSet, CreateModelMixin):
             user_token = get_tokens_for_user(user)
             return Response({'token': user_token,
                              "message": "User created successfully",
+                             "user_id": user.id,
                              "user_profile_id": user_profile.id},
                             status=status.HTTP_201_CREATED)
-
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -127,12 +127,14 @@ class UserView(GenericViewSet, ListModelMixin):
     serializer_class = UserSerializer
 
 
-
-
 class ProfileAPI(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixin, mixins.RetrieveModelMixin,
                  mixins.UpdateModelMixin, mixins.DestroyModelMixin):
     serializer_class = ProfileSerializer
     queryset = UserProfile.objects.all()
+
+    def get_queryset(self):
+        user = self.request.user
+        return UserProfile.objects.filter(user=user)
 
 
 class FollowerViewSet(GenericViewSet, ListModelMixin):
@@ -168,10 +170,7 @@ class VerifyOTPView(APIView):
             serializer.save(user=request.user if request.user.is_authenticated else None)
             user = serializer.validated_data['user']
             if user:
-                refresh = RefreshToken.for_user(user)
                 return Response({
-                    'access_token': str(refresh.access_token),
-                    'refresh_token': str(refresh),
                     'message': 'OTP verified successfully and account activated!'
                 }, status=status.HTTP_200_OK)
             else:
@@ -210,7 +209,6 @@ class GenerateOTPView(generics.GenericAPIView, mixins.UpdateModelMixin):
 
         return Response({'message': 'OTP Sent successfully'},
                         status=status.HTTP_200_OK)
-
 
 # class FollowViewSet(mixins.CreateModelMixin, GenericViewSet, mixins.ListModelMixin, mixins.DestroyModelMixin):
 #     serializer_class = UserFollowSerializer
