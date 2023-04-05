@@ -41,7 +41,7 @@ class UserRegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'password', 'first_name', 'is_active', 'last_name', 'confirm_password')
+        fields = ('id', 'username', 'password', 'confirm_password', 'first_name', 'last_name', 'is_active')
 
     def validate_password(self, value, user=None):
         regex = re.compile(r'^(?=.*[!@#$%^&*()_+\-=[\]{};:\'"\\|,.<>/?])(?=.*[A-Z])(?=.*[a-z])(?=.*\d)[^\s]{8,}$')
@@ -149,13 +149,13 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserProfile
-        exclude = ('followers', 'following', 'otp', 'otp_at')
+        exclude = ('followers', 'otp', 'otp_at')
 
     def get_follower_count(self, obj):
         return obj.followers.count()
 
     def get_following_count(self, obj):
-        return obj.following.count()
+        return obj.user.following.count()
 
 
 class FollowersSerializer(serializers.ModelSerializer):
@@ -175,7 +175,7 @@ class FollowingSerializer(serializers.ModelSerializer):
 
     def get_following(self, obj):
         return [{'id': user.id, 'username': user.username, 'profile': {'profile_pic': str(user.userprofile.image)}}
-                for user in obj.following.all()]
+                for user in obj.user.following.all()]
 
     class Meta:
         model = UserProfile
@@ -246,3 +246,12 @@ class UserProfileOTPSerializer(serializers.ModelSerializer):
         if not attrs.get('phone_number') and not attrs.get('email'):
             raise serializers.ValidationError("Either phone number or email is required")
         return attrs
+
+
+# class UserFollowSerializer(serializers.ModelSerializer):
+#     # following = UserSerializer(read_only=True, many=True)
+#     followers = UserSerializer(read_only=True, many=True)
+#
+#     class Meta:
+#         model = UserProfile
+#         fields = ('user', 'followers')

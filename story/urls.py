@@ -8,7 +8,7 @@ router = DefaultRouter()
 
 router.register(r'story', views.StoryView, basename='story'),
 router.register(r'archive', views.ArchiveStoryView, basename='archive'),
-# router.register(r'highlights', views.HighlightStoryView, basename='highlights'),
+router.register(r'highlights', views.HighlightStoryView, basename='highlights'),
 
 #
 

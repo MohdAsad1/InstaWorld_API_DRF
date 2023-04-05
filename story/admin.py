@@ -7,4 +7,4 @@ from story.models import Story
 
 @admin.register(Story)
 class StoryAdmin(admin.ModelAdmin):
-    list_display = ['user', 'media', 'content', 'created_at', 'is_archived']
+    list_display = ['user', 'media', 'created_at', 'is_archived', 'is_highlighted']

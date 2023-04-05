@@ -1,6 +1,9 @@
 from django.contrib.auth import authenticate
 from django.db.models import Q
 from rest_framework import serializers, generics
+from django.shortcuts import get_object_or_404
+from rest_framework import serializers
+
 from rest_framework.authentication import BasicAuthentication
 from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, UpdateModelMixin, ListModelMixin
 from rest_framework.permissions import IsAdminUser
@@ -38,6 +41,7 @@ class UserRegister(GenericViewSet, CreateModelMixin):
                              "message": "User created successfully",
                              "user_profile_id": user_profile.id},
                             status=status.HTTP_201_CREATED)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -56,16 +60,21 @@ class UserLogIn(GenericViewSet, CreateModelMixin):
             password = request.data.get('password')
             user = User.objects.filter(Q(email=username_or_email) | Q(username=username_or_email)).first()
             print(user)
+
             # user = authenticate(**data)
             if not user:
                 raise serializers.ValidationError("No such user found. Register First!")
-            if user.check_password(password):
+            if user.check_password(password) and user.is_active:
                 user_token = get_tokens_for_user(user)
 
                 return Response({'token': user_token,
                                  "data": serializer.data,
                                  'message': "Successfully Logged In",
                                  }, status=status.HTTP_200_OK)
+            elif not user.is_active:
+                return Response({
+                    'message': "Account is inactive",
+                }, status=status.HTTP_401_UNAUTHORIZED)
         return Response({
             'data': serializer.errors}, status=status.HTTP_404_NOT_FOUND)
 
@@ -116,6 +125,8 @@ class UserView(GenericViewSet, ListModelMixin):
     """View to get post of the users followed by user"""
     queryset = User.objects.all()
     serializer_class = UserSerializer
+
+
 
 
 class ProfileAPI(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixin, mixins.RetrieveModelMixin,
@@ -199,3 +210,39 @@ class GenerateOTPView(generics.GenericAPIView, mixins.UpdateModelMixin):
 
         return Response({'message': 'OTP Sent successfully'},
                         status=status.HTTP_200_OK)
+
+
+# class FollowViewSet(mixins.CreateModelMixin, GenericViewSet, mixins.ListModelMixin, mixins.DestroyModelMixin):
+#     serializer_class = UserFollowSerializer
+#     queryset = User.objects.all()
+#     permission_classes = [IsAuthenticated]
+#
+#     def create(self, request, *args, **kwargs):
+#         user_id = request.data.get('user')
+#         if not user_id:
+#             return Response({'error': 'Please enter valid user id'}, status=status.HTTP_400_BAD_REQUEST)
+#         user_to_follow = get_object_or_404(User, id=user_id)
+#         if request.user == user_to_follow:
+#             return Response({'error': 'You cannot follow himself'}, status=status.HTTP_400_BAD_REQUEST)
+#         try:
+#             profile = user_to_follow.userprofile
+#         except UserProfile.DoesNotExist:
+#             UserProfile.objects.create(user=user_to_follow)
+#
+#         # if request.user.userprofile is None:
+#         #     UserProfile.objects.create(user=self.request.user)
+#         try:
+#             profile = self.request.user.userprofile
+#         except UserProfile.DoesNotExist:
+#             UserProfile.objects.create(user=self.request.user)
+#         profile=UserProfile.objects.get(user=request.user)
+#         user_to_follow.userprofile.followers.add(request.user)
+#         serializer = self.get_serializer(request.user.userprofile)
+#         return Response({'message': f'now {self.request.user.username} is following {user_to_follow.username}',
+#                          'data': serializer.data}, status=status.HTTP_201_CREATED)
+#
+#     def destroy(self, request, pk=None):
+#         user_to_unfollow = get_object_or_404(User, id=pk)
+#         request.user.userprofile.user.following.remove(user_to_unfollow)
+#         user_to_unfollow.userprofile.followers.remove(request.user)
+#         return Response(status=status.HTTP_204_NO_CONTENT)
