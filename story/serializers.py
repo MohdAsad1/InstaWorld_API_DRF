@@ -20,16 +20,21 @@ class StorySerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     profile_pic = serializers.SerializerMethodField()
     # profile_pic = serializers.ImageField(source='userprofile.image', read_only=True)
+    is_user_story = serializers.SerializerMethodField()
 
     class Meta:
         model = Story
-        fields = ('id', 'user', 'profile_pic', 'media', 'content', 'created_at', 'is_archived')
+        fields = ('id', 'user', 'profile_pic', 'media', 'content', 'is_user_story', 'created_at', 'is_archived')
         read_only_fields = ["user", "profile_pic"]
 
     def get_profile_pic(self, obj):
         user = self.context['request'].user
         profile = ProfileSerializer(UserProfile.objects.get(user=user))
         return profile.data
+
+    def get_is_user_story(self, obj) -> bool:
+        user: User = self.context["request"].user
+        return user.is_authenticated and user.story_set.filter(pk=obj.id).exists()
 
 
 class ArchiveStorySerializer(serializers.ModelSerializer):
@@ -53,7 +58,7 @@ class HighlightStorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Story
-        fields = ('id', 'user', 'profile_pic', 'media', 'content', 'created_at', 'is_archived')
+        fields = ('id', 'user', 'profile_pic', 'media', 'created_at', 'is_archived', 'is_highlighted')
         read_only_fields = ['user', 'profile_pic']
 
     def get_profile_pic(self, obj):
