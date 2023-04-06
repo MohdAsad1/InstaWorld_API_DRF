@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -5,9 +6,9 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelM
     DestroyModelMixin, RetrieveModelMixin
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from post.models import Post
+from post.models import Post, Comment
 from post.serializers import PostSerializers, UserFollowersPostSerializer, PostSavedSerializer, PostListSerializer, \
-    PostLikeSerializer, PostSaveSerializer, PostCommentSerializer
+    PostLikeSerializer, PostSaveSerializer, PostCommentSerializer, CreateCommentSerializer
 
 
 def get_tokens_for_user(user):
@@ -43,8 +44,8 @@ class UserFollowersPostApi(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
     queryset = Post.objects.all()
 
     def get_queryset(self):
-        posts = self.request.user.profile.followers.all()
-        return Post.objects.filter(user__in=posts)
+        posts = self.request.user.userprofile.followers.all()
+        return Post.objects.filter(user__in=posts).order_by('?')
 
 
 class UserPostLikeApi(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin,
@@ -79,7 +80,7 @@ class PostListView(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         return Response(serializers.data)
 
 
-class PostLikeView(GenericViewSet, ListModelMixin, RetrieveModelMixin):
+class PostLikeView(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateModelMixin):
     serializer_class = PostLikeSerializer
     queryset = Post.objects.all()
     permission_classes = [IsAuthenticated]
@@ -87,11 +88,20 @@ class PostLikeView(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def list(self, request, *args, **kwargs):
         user = self.request.query_params.get('user_id')
         print(user)
-        serializers = PostListSerializer(Post.objects.filter('likes'))
+        serializers = PostListSerializer(Post.objects.filter(likes=user), many=True)
         return Response(serializers.data)
 
+    def create(self, request, *args, **kwargs):
+        user = self.request.POST["user"]
+        post = self.request.POST["post"]
+        user = User.objects.get(id=user)
+        post = Post.objects.get(id=post)
+        post.likes.add(user)
+        post.save()
+        return Response(PostLikeSerializer(post).data)
 
-class PostSaveView(GenericViewSet, ListModelMixin, RetrieveModelMixin):
+
+class PostSaveView(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateModelMixin):
     serializer_class = PostSaveSerializer
     queryset = Post.objects.all()
 
@@ -102,6 +112,15 @@ class PostSaveView(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         print(serializers)
         return Response(serializers.data)
 
+    def create(self, request, *args, **kwargs):
+        user = self.request.POST["user"]
+        post = self.request.POST["post"]
+        user = User.objects.get(id=user)
+        post = Post.objects.get(id=post)
+        post.saved_by.add(user)
+        post.save()
+        return Response(PostSaveSerializer(post).data)
+
 
 class PostCommentView(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateModelMixin):
     serializer_class = PostCommentSerializer
@@ -111,3 +130,22 @@ class PostCommentView(GenericViewSet, ListModelMixin, RetrieveModelMixin, Create
         id = self.request.query_params.get('post_id')
         serializers = PostCommentSerializer(Post.objects.filter(id=id), many=True)
         return Response(serializers.data)
+
+
+class CreateCommentView(GenericViewSet, CreateModelMixin):
+    serializer_class = CreateCommentSerializer
+    queryset = Comment.objects.all()
+
+    def create(self, request, *args, **kwargs):
+        comment = self.request.POST["comment"]
+        user = self.request.POST["user"]
+        post = self.request.POST["post"]
+        create = Comment()
+        user = User.objects.get(id=user)
+        post = Post.objects.get(id=post)
+        create.comment = comment
+        create.user = user
+        create.save()
+        post.comments.add(create)
+        post.save()
+        return Response(CreateCommentSerializer(create).data)

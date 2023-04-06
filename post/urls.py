@@ -15,7 +15,7 @@ router.register("particular_user_post", views.PostListView, basename="particular
 router.register("particular_user_post_like", views.PostLikeView, basename="particular_user_post_like")
 router.register("particular_user_post_save", views.PostSaveView, basename="particular_user_post_save")
 router.register("particular_user_post_comment", views.PostCommentView, basename="particular_user_post_comment")
-
+router.register("create_comment", views.CreateCommentView, basename="create_comment")
 urlpatterns = [
     path('', include(router.urls))
 
