@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
+from account.models import UserProfile
 from post.models import Post, Image, Video, Comment
 
 
@@ -20,7 +21,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         exclude = ['password', 'is_active', 'is_staff', 'last_login', 'is_superuser', 'date_joined',
-                   'groups', 'user_permissions']
+                   'groups', 'user_permissions', "email"]
 
 
 class PostSerializers(serializers.ModelSerializer):
@@ -136,3 +137,11 @@ class PostCommentSerializer(serializers.ModelSerializer):
     def get_comment(self, obj):
         obj = obj.comments.values_list('comment', flat=True)
         return obj
+
+
+class SearchFeedPostSerializer(serializers.ModelSerializer):
+    images = ImageSerializer(many=True, required=False)
+
+    class Meta:
+        model = Post
+        fields = ["id", "images"]

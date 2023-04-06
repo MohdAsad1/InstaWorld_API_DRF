@@ -1,10 +1,12 @@
+from django.contrib.auth.models import User
 from django.db.models import Q
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import CreateModelMixin, ListModelMixin, UpdateModelMixin
 
+from account.models import UserProfile
 from .models import Story
 from django.utils import timezone
 
@@ -21,10 +23,12 @@ class StoryView(GenericViewSet, CreateModelMixin, ListModelMixin):
 
     def get_queryset(self):
         now = timezone.now()
+        following_users = User.objects.filter(userprofile__followers=self.request.user)
+
+        print(following_users)
         Story.objects.filter(created_at__lte=now - timezone.timedelta(minutes=300)).update(is_archived=True)
-        following_users = self.request.user.userprofile.following.all()
         queryset = Story.objects.filter(
-            Q(user=self.request.user) | Q(user__in=following_users),
+            (Q(user=self.request.user) | Q(user__in=following_users)),
             created_at__lt=now,
             is_archived=False,
         )

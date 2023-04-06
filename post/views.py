@@ -4,10 +4,9 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, \
     DestroyModelMixin, RetrieveModelMixin
 from rest_framework_simplejwt.tokens import RefreshToken
-
 from post.models import Post
 from post.serializers import PostSerializers, UserFollowersPostSerializer, PostSavedSerializer, PostListSerializer, \
-    PostLikeSerializer, PostSaveSerializer, PostCommentSerializer
+    PostLikeSerializer, PostSaveSerializer, PostCommentSerializer, SearchFeedPostSerializer
 
 
 def get_tokens_for_user(user):
@@ -43,8 +42,8 @@ class UserFollowersPostApi(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
     queryset = Post.objects.all()
 
     def get_queryset(self):
-        posts = self.request.user.profile.followers.all()
-        return Post.objects.filter(user__in=posts)
+        posts = self.request.user.userprofile.followers.all()
+        return Post.objects.filter(user__in=posts).order_by("?")
 
 
 class UserPostLikeApi(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin,
@@ -111,3 +110,13 @@ class PostCommentView(GenericViewSet, ListModelMixin, RetrieveModelMixin, Create
         id = self.request.query_params.get('post_id')
         serializers = PostCommentSerializer(Post.objects.filter(id=id), many=True)
         return Response(serializers.data)
+
+
+class SearchFeedPost(GenericViewSet, ListModelMixin):
+    serializer_class = SearchFeedPostSerializer
+    queryset = Post
+
+    def get_queryset(self):
+        followers = self.request.user.userprofile.followers.all()
+        users_to_exclude = [follower for follower in followers]
+        return Post.objects.exclude(user__in=users_to_exclude).order_by("?")
