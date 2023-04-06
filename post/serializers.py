@@ -73,12 +73,39 @@ class PostSerializers(serializers.ModelSerializer):
         return post
 
 
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ('image',)
+
+
+class PostLikeSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+
+    class Meta:
+        model = Post
+        exclude = ['likes', 'comments', 'saved_by']
+
+
 class UserFollowersPostSerializer(serializers.ModelSerializer):
+    user_profile = UserProfileSerializer(source='user.userprofile', read_only=True)
+    has_liked = serializers.SerializerMethodField()
+    has_saved = serializers.SerializerMethodField()
+    images = ImageSerializer(many=True, required=False)
+    videos = VideoSerializer(many=True, required=False)
     user = UserSerializer(read_only=True)
 
     class Meta:
         model = Post
         fields = "__all__"
+
+    def get_has_liked(self, obj: Post) -> bool:
+        user: User = self.context["request"].user
+        return user.is_authenticated and user.users_likes.filter(pk=obj.pk).exists()
+
+    def get_has_saved(self, obj: Post) -> bool:
+        user: User = self.context["request"].user
+        return user.is_authenticated and user.saved_posts.filter(pk=obj.pk).exists()
 
 
 class UserPostLikeSerializer(serializers.ModelSerializer):
@@ -110,14 +137,6 @@ class PostSavedSerializer(PostSerializers):
     pass
 
 
-class PostLikeSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
-
-    class Meta:
-        model = Post
-        exclude = ['likes', 'comments', 'saved_by']
-
-
 class PostSaveSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
 
@@ -128,15 +147,27 @@ class PostSaveSerializer(serializers.ModelSerializer):
 
 class PostCommentSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
-    comment = serializers.SerializerMethodField()
+    comments = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
-        fields = ('user', 'comment')
+        fields = ('user', 'comments', 'post_description')
 
-    def get_comment(self, obj):
-        obj = obj.comments.values_list('comment', flat=True)
-        return obj
+
+    def get_comments(self, obj):
+        comments = obj.comments.all().values('comment', 'created_at', 'user__username', 'user__userprofile__image')
+        return [
+            {
+                'comment': comment['comment'],
+                'created_at': comment['created_at'],
+                'user': {
+                    'username': comment['user__username'],
+                    'profile_pic': comment['user__userprofile__image'] if comment[
+                        'user__userprofile__image'] else None
+                }
+            }
+            for comment in comments
+        ]
 
 
 class SearchFeedPostSerializer(serializers.ModelSerializer):
@@ -145,3 +176,12 @@ class SearchFeedPostSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = ["id", "images"]
+
+
+class CreateCommentSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+
+    class Meta:
+        model = Comment
+        fields = ('comment', 'user')
+
