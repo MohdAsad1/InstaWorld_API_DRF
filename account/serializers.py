@@ -283,3 +283,85 @@ class UserFollowSerializer(serializers.ModelSerializer):
         user_followings = ProfileFollowerSerializer(obj.user.following.all(), many=True)
         print(obj.user.following.count())
         return user_followings.data
+
+class TokenSerializer(serializers.Serializer):
+    token = serializers.CharField()
+
+
+# class UserFollowSerializer(serializers.ModelSerializer):
+#     # following = UserSerializer(read_only=True, many=True)
+#     followers = UserSerializer(read_only=True, many=True)
+#
+#     class Meta:
+#         model = UserProfile
+#         fields = ('user', 'followers')
+
+
+class ForgotPasswordOTPSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(required=True)
+    phone_number = serializers.CharField(required=False)
+    email = serializers.EmailField(required=False)
+
+    class Meta:
+        model = UserProfile
+        fields = ('id', 'otp', 'otp_at', 'phone_number', 'email', 'username')
+
+    def generate_otp(self, user_profile, validated_data):
+        username = validated_data.get('username')
+        email = validated_data.get('email')
+        phone_number = validated_data.get('phone_number')
+        user = user_profile.user
+        otp = str(random.randint(100000, 999999))
+
+        if username and User.objects.filter(username=username).exists():
+            user = User.objects.get(username=username)
+            if email:
+                if user.email != email:
+                    raise serializers.ValidationError("The email provided does not match the saved email.")
+                else:
+                    send_otp(self, email, otp)
+            if phone_number:
+                if hasattr(user, 'phone_number') and user.profile.phone_number != phone_number:
+                    raise serializers.ValidationError(
+                        "The phone number provided does not match the saved phone number.")
+                else:
+                    validate_phone_number(self, phone_number)
+                    send_otp_on_phone(self, phone_number, otp)
+
+            user_profile.otp_at = datetime.now()
+            user_profile.otp = otp
+            user_profile.save()
+            return otp, user
+
+    def validate(self, attrs):
+        if not attrs.get('phone_number') and not attrs.get('email'):
+            raise serializers.ValidationError("Either phone number or email is required for Forgot Password")
+        return attrs
+
+
+class ForgotPasswordSerializer(serializers.ModelSerializer):
+    new_password = serializers.CharField(max_length=20, write_only=True, style={'input_type': 'password'})
+    confirm_password = serializers.CharField(max_length=20, write_only=True, style={'input_type': 'password'})
+
+    class Meta:
+        model = User
+        fields = ['new_password', 'confirm_password']
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(write_only=True)
+    user = UserSerializer(read_only=True)
+    profile = ProfileSerializer(read_only=True)
+
+    class Meta:
+        model = UserProfile
+        fields = ('id', 'username', 'user', 'profile', 'phone_number',)
+
+    def create(self, validated_data):
+        username = validated_data.pop('username')
+        try:
+            user = User.objects.get(username=username)
+            user_profile = UserProfile.objects.get(user=user)
+            return user_profile
+        except User.DoesNotExist:
+            raise serializers.ValidationError('User does not exist.')
