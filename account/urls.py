@@ -21,6 +21,7 @@ router.register('get_followers_list', views.FollowerViewSet, basename='get_follo
 router.register('get_following_list', views.FollowingViewSet, basename='get_following_list')
 router.register('logout', LogoutViewSet, basename='logout')
 router.register('forgot_password', ForgotPassword, basename='forgot_password')
+router.register('particular_user_profile', views.ProfileListView, basename='particular_user_profile')
 
 
 urlpatterns = [

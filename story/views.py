@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
-from rest_framework.mixins import CreateModelMixin, ListModelMixin, UpdateModelMixin
+from rest_framework.mixins import CreateModelMixin, ListModelMixin, UpdateModelMixin, DestroyModelMixin
 
 from account.models import UserProfile
 from .models import Story
@@ -13,7 +13,7 @@ from django.utils import timezone
 from .serializers import StorySerializer, ArchiveStorySerializer, HighlightStorySerializer
 
 
-class StoryView(GenericViewSet, CreateModelMixin, ListModelMixin):
+class StoryView(GenericViewSet, CreateModelMixin, ListModelMixin, DestroyModelMixin):
     queryset = Story
     serializer_class = StorySerializer
     permission_classes = [IsAuthenticated]
@@ -24,8 +24,6 @@ class StoryView(GenericViewSet, CreateModelMixin, ListModelMixin):
     def get_queryset(self):
         now = timezone.now()
         following_users = User.objects.filter(userprofile__followers=self.request.user)
-
-        print(following_users)
         Story.objects.filter(created_at__lte=now - timezone.timedelta(minutes=300)).update(is_archived=True)
         queryset = Story.objects.filter(
             (Q(user=self.request.user) | Q(user__in=following_users)),
@@ -35,7 +33,7 @@ class StoryView(GenericViewSet, CreateModelMixin, ListModelMixin):
         return queryset
 
 
-class ArchiveStoryView(GenericViewSet, CreateModelMixin, ListModelMixin):
+class ArchiveStoryView(GenericViewSet, CreateModelMixin, ListModelMixin, DestroyModelMixin):
     queryset = Story
     serializer_class = ArchiveStorySerializer
     permission_classes = [IsAuthenticated]

@@ -130,6 +130,7 @@ class PostCommentView(GenericViewSet, ListModelMixin, RetrieveModelMixin, Create
         serializers = PostCommentSerializer(Post.objects.filter(id=id), many=True)
         return Response(serializers.data)
 
+
 class SearchFeedPost(GenericViewSet, ListModelMixin):
     serializer_class = SearchFeedPostSerializer
     queryset = Post
@@ -143,6 +144,7 @@ class SearchFeedPost(GenericViewSet, ListModelMixin):
 class CreateCommentView(GenericViewSet, CreateModelMixin):
     serializer_class = CreateCommentSerializer
     queryset = Comment.objects.all()
+    permission_classes = [IsAuthenticated]
 
     def create(self, request, *args, **kwargs):
         comment = self.request.POST["comment"]

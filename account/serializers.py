@@ -27,10 +27,10 @@ class UserSerializer(serializers.ModelSerializer):
 
 class UserRegisterSerializer(serializers.ModelSerializer):
     """Serializer to Register user"""
-    username = serializers.CharField(trim_whitespace=False)
-    first_name = serializers.CharField(max_length=20, min_length=3, required=True,
+    username = serializers.CharField(trim_whitespace=False, required=True)
+    first_name = serializers.CharField(max_length=20, min_length=2, required=True,
                                        trim_whitespace=False)
-    last_name = serializers.CharField(max_length=20, min_length=3, required=True,
+    last_name = serializers.CharField(max_length=20, min_length=2, required=True,
                                       trim_whitespace=False)
 
     password = serializers.CharField(max_length=20, min_length=8, required=True,
@@ -52,19 +52,14 @@ class UserRegisterSerializer(serializers.ModelSerializer):
                                               "and no spaces.")
         return value
 
-    # def validate_username(self, value):
-    #     if not value.isalnum() or ' ' in value:
-    #         raise serializers.ValidationError(" Username should contain alphanumeric value and spaces not allowed")
-    #     if not any(char.isalpha() for char in value):
-    #         raise serializers.ValidationError("Username should contain atleast one alphabet.")
-    #     return value
-
     def validate_username(self, value):
         if any(char not in string.ascii_letters + string.digits + string.punctuation for char in value):
             raise serializers.ValidationError(
                 "Username should contain alphanumeric characters and special characters only.")
         if not any(char.isalpha() for char in value):
             raise serializers.ValidationError("Username should contain at least one alphabet.")
+        if User.objects.filter(username=value).exists():
+            raise  serializers.ValidationError("Username already exist")
         return value
 
     def validate_first_name(self, value):
@@ -364,3 +359,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return user_profile
         except User.DoesNotExist:
             raise serializers.ValidationError('User does not exist.')
+
+#
+# class TokenRefreshSerializer(serializers.Serializer):
+#     refresh_token = serializers.CharField()
+
+
+class ProfileListSerializer(ProfileSerializer):
+    class Meta:
+        model = UserProfile
+        exclude = ('followers', 'otp', 'otp_at')

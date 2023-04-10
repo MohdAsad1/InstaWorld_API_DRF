@@ -10,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from account.serializers import UserRegisterSerializer, UserLogInSerializer, UserChangePasswordSerializer, \
     DeleteUserSerializer, ProfileSerializer, UserSearchSerializer, FollowingSerializer, FollowersSerializer, \
     UserProfileOTPSerializer, ForgotPasswordOTPSerializer, ForgotPasswordSerializer, \
-    UserProfileSerializer, UserFollowSerializer, UserSerializer, VerifyOTPSerializer
+    UserProfileSerializer, UserFollowSerializer, UserSerializer, VerifyOTPSerializer, ProfileListSerializer
 from post.utils import get_tokens_for_user
 from django.contrib.auth.models import User
 from rest_framework.viewsets import GenericViewSet
@@ -114,7 +114,7 @@ class DeleteUser(GenericViewSet, DestroyModelMixin):
     permission_classes = [IsAdminUser]
 
 
-class UserView(GenericViewSet, ListModelMixin):
+class UserView(GenericViewSet, ListModelMixin, UpdateModelMixin):
     """View to get post of the users followed by user"""
     queryset = User
     serializer_class = UserSerializer
@@ -125,6 +125,12 @@ class UserView(GenericViewSet, ListModelMixin):
         queryset = User.objects.filter(id=user.id)
         return queryset
 
+    def update(self, request, *args, **kwargs):
+        user = request.user
+        serializer = UserSerializer(user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
 
 class ProfileAPI(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixin, mixins.RetrieveModelMixin,
@@ -222,25 +228,18 @@ class UserFollowView(mixins.CreateModelMixin, GenericViewSet, mixins.DestroyMode
             return Response({'error': 'Please enter valid user id'}, status=status.HTTP_400_BAD_REQUEST)
         user_to_follow = get_object_or_404(User, id=user_id)
         if request.user == user_to_follow:
-            return Response({'error': 'You cannot follow himself'}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            profile = user_to_follow.userprofile
-        except UserProfile.DoesNotExist:
-            UserProfile.objects.create(user=user_to_follow)
-        try:
-            profile = self.request.user.userprofile
-        except UserProfile.DoesNotExist:
-            UserProfile.objects.create(user=self.request.user)
-        user_to_follow.userprofile.followers.add(request.user)
-        serializer = self.get_serializer(request.user.userprofile)
-        print(request.user.following.count())
-        return Response({'message': f'now {self.request.user.username} is following {user_to_follow.username}',
-                         'data': serializer.data}, status=status.HTTP_201_CREATED)
+            return Response({'error': 'You cannot follow yourself'}, status=status.HTTP_400_BAD_REQUEST)
 
-    def destroy(self, request, pk=None):
-        user_to_unfollow = get_object_or_404(User, id=pk)
-        user_to_unfollow.userprofile.followers.remove(request.user)
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        if user_to_follow.userprofile.followers.filter(id=request.user.id).exists():
+            user_to_follow.userprofile.followers.remove(request.user)
+            return Response({'message': f'You are no longer following {user_to_follow.username}.'},
+                            status=status.HTTP_204_NO_CONTENT)
+        else:
+            user_to_follow.userprofile.followers.add(request.user)
+            serializer = self.get_serializer(request.user.userprofile)
+            return Response({'message': f'You are now following {user_to_follow.username}.',
+                             'data': serializer.data}, status=status.HTTP_201_CREATED)
+
 
 class LogoutViewSet(viewsets.ViewSet):
     authentication_classes = [TokenAuthentication]
@@ -255,41 +254,6 @@ class LogoutViewSet(viewsets.ViewSet):
 
         # return a success response
         return Response({'detail': 'Successfully logged out.'})
-
-# class FollowViewSet(mixins.CreateModelMixin, GenericViewSet, mixins.ListModelMixin, mixins.DestroyModelMixin):
-#     serializer_class = UserFollowSerializer
-#     queryset = User.objects.all()
-#     permission_classes = [IsAuthenticated]
-#
-#     def create(self, request, *args, **kwargs):
-#         user_id = request.data.get('user')
-#         if not user_id:
-#             return Response({'error': 'Please enter valid user id'}, status=status.HTTP_400_BAD_REQUEST)
-#         user_to_follow = get_object_or_404(User, id=user_id)
-#         if request.user == user_to_follow:
-#             return Response({'error': 'You cannot follow himself'}, status=status.HTTP_400_BAD_REQUEST)
-#         try:
-#             profile = user_to_follow.userprofile
-#         except UserProfile.DoesNotExist:
-#             UserProfile.objects.create(user=user_to_follow)
-#
-#         # if request.user.userprofile is None:
-#         #     UserProfile.objects.create(user=self.request.user)
-#         try:
-#             profile = self.request.user.userprofile
-#         except UserProfile.DoesNotExist:
-#             UserProfile.objects.create(user=self.request.user)
-#         profile=UserProfile.objects.get(user=request.user)
-#         user_to_follow.userprofile.followers.add(request.user)
-#         serializer = self.get_serializer(request.user.userprofile)
-#         return Response({'message': f'now {self.request.user.username} is following {user_to_follow.username}',
-#                          'data': serializer.data}, status=status.HTTP_201_CREATED)
-#
-#     def destroy(self, request, pk=None):
-#         user_to_unfollow = get_object_or_404(User, id=pk)
-#         request.user.userprofile.user.following.remove(user_to_unfollow)
-#         user_to_unfollow.userprofile.followers.remove(request.user)
-#         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ForgotPasswordOTPView(generics.GenericAPIView, mixins.UpdateModelMixin):
@@ -343,4 +307,70 @@ class ForgotPassword(GenericViewSet, UpdateModelMixin):
 
 class UserProfileIdView(generics.CreateAPIView):
     serializer_class = UserProfileSerializer
+
+
+# class TokenRefreshViewSet(GenericViewSet, UpdateModelMixin):
+#     serializer_class = TokenRefreshSerializer
+#
+#     # def update(self, request, *args, **kwargs):
+#     #     """
+#     #     Refreshes an access token using a refresh token.
+#     #     """
+#     #     serializer = self.get_serializer(data=request.data)
+#     #     serializer.is_valid(raise_exception=True)
+#     #
+#     #     refresh_token = serializer.validated_data['refresh_token']
+#     #
+#     #     if not refresh_token:
+#     #         return Response({'error': 'refresh_token field is required.'}, status=status.HTTP_400_BAD_REQUEST)
+#     #
+#     #     from rest_framework.authtoken.models import Token
+#     #
+#     #     try:
+#     #         token = Token.objects.get(key=refresh_token)
+#     #     except Token.DoesNotExist:
+#     #         return Response({'error': 'Invalid refresh token.'}, status=status.HTTP_400_BAD_REQUEST)
+#     #
+#     #     user = token.user
+#     #     new_token, created = Token.objects.get_or_create(user=user)
+#     #
+#     #     return Response({'access_token': new_token.key}, status=status.HTTP_200_OK)
+#     @action(detail=False, methods=['post'])
+#     def refresh_token(self, request):
+#         """
+#         Refreshes an access token using a refresh token.
+#         """
+#         serializer = self.get_serializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+#
+#         refresh_token = serializer.validated_data['refresh_token']
+#
+#         if not refresh_token:
+#             return Response({'error': 'refresh_token field is required.'}, status=status.HTTP_400_BAD_REQUEST)
+#
+#         # Your logic to verify the refresh token and generate a new access token using the refresh token.
+#         # For example, you could use the Django's built-in token authentication:
+#
+#         from rest_framework.authtoken.models import Token
+#
+#         try:
+#             token = Token.objects.get(key=refresh_token)
+#         except:
+#             return Response({'error': 'Invalid refresh token.'}, status=status.HTTP_400_BAD_REQUEST)
+#
+#         user = token.user
+#         new_token, created = Token.objects.get_or_create(user=user)
+#
+#         return Response({'access_token': new_token.key}, status=status.HTTP_200_OK)
+
+
+class ProfileListView(GenericViewSet, ListModelMixin):
+    serializers_class = ProfileListSerializer
+    queryset = UserProfile.objects.all()
+
+    def list(self, request, args, *kwargs):
+        user = self.request.query_params.get('user_id')
+        serializer = ProfileListSerializer(UserProfile.objects.filter(user__id=user), many=True)
+        return Response(serializer.data)
+
 

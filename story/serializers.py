@@ -26,7 +26,7 @@ class StorySerializer(serializers.ModelSerializer):
         fields = ('id', 'user', 'profile_pic', 'media', 'is_user_story', 'created_at', 'is_archived')
         read_only_fields = ["user", "profile_pic"]
 
-    def get_profile_pic(self, obj):
+    def get_profile_pic(self, obj) -> bool:
         user = self.context['request'].user
         profile = ProfileSerializer(UserProfile.objects.get(user=user))
         return profile.data
