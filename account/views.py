@@ -57,8 +57,10 @@ class UserLogIn(GenericViewSet, CreateModelMixin):
                 raise serializers.ValidationError("No such user found. Register First!")
             if user.check_password(password) and user.is_active:
                 user_token = get_tokens_for_user(user)
+                user_id = user.id
 
                 return Response({'token': user_token,
+                                 'user_id': user_id,
                                  "data": serializer.data,
                                  'message': "Successfully Logged In",
                                  }, status=status.HTTP_200_OK)

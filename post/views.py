@@ -10,7 +10,6 @@ from post.serializers import PostSerializers, UserFollowersPostSerializer, PostS
     PostLikeSerializer, PostSaveSerializer, PostCommentSerializer, CreateCommentSerializer, SearchFeedPostSerializer
 
 
-
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
 
@@ -46,7 +45,6 @@ class UserFollowersPostApi(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
     def get_queryset(self):
         posts = self.request.user.userprofile.followers.all()
         return Post.objects.filter(user__in=posts).order_by('?')
-
 
 
 class UserPostLikeApi(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin,
@@ -140,6 +138,7 @@ class SearchFeedPost(GenericViewSet, ListModelMixin):
         followers = self.request.user.userprofile.followers.all()
         users_to_exclude = [follower for follower in followers]
         return Post.objects.exclude(user__in=users_to_exclude).order_by("?")
+
 
 class CreateCommentView(GenericViewSet, CreateModelMixin):
     serializer_class = CreateCommentSerializer

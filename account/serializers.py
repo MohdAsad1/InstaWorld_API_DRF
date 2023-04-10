@@ -150,6 +150,7 @@ class UserSearchSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'first_name', 'last_name', 'profile_pic']
 
+
 class ProfileSerializer(serializers.ModelSerializer):
     follower_count = serializers.SerializerMethodField()
     following_count = serializers.SerializerMethodField()
@@ -272,8 +273,6 @@ class ProfileFollowerSerializer(serializers.ModelSerializer):
 
 class UserFollowSerializer(serializers.ModelSerializer):
     following = serializers.SerializerMethodField()
-
-    # followers = UserSerializer(read_only=True, many=True)
 
     class Meta:
         model = UserProfile
