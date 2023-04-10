@@ -1,3 +1,4 @@
+import string
 from datetime import timezone, datetime
 from random import random
 
@@ -51,11 +52,19 @@ class UserRegisterSerializer(serializers.ModelSerializer):
                                               "and no spaces.")
         return value
 
+    # def validate_username(self, value):
+    #     if not value.isalnum() or ' ' in value:
+    #         raise serializers.ValidationError(" Username should contain alphanumeric value and spaces not allowed")
+    #     if not any(char.isalpha() for char in value):
+    #         raise serializers.ValidationError("Username should contain atleast one alphabet.")
+    #     return value
+
     def validate_username(self, value):
-        if not value.isalnum() or ' ' in value:
-            raise serializers.ValidationError(" Username should contain alphanumeric value and spaces not allowed")
+        if any(char not in string.ascii_letters + string.digits + string.punctuation for char in value):
+            raise serializers.ValidationError(
+                "Username should contain alphanumeric characters and special characters only.")
         if not any(char.isalpha() for char in value):
-            raise serializers.ValidationError("Username should contain atleast one alphabet.")
+            raise serializers.ValidationError("Username should contain at least one alphabet.")
         return value
 
     def validate_first_name(self, value):
@@ -139,8 +148,7 @@ class UserSearchSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'profile_pic']
-        # exclude = ['password', 'last_login', 'is_superuser', 'is_staff', 'date_joined', 'groups', 'user_permissions']
+        fields = ['id', 'username', 'first_name', 'last_name', 'profile_pic']
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -247,6 +255,33 @@ class UserProfileOTPSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Either phone number or email is required")
         return attrs
 
+
+class UserDetailSerializer(UserSerializer):
+    class Meta:
+        model = User
+        fields = ["id", "username", "first_name", "last_name"]
+
+
+class ProfileFollowerSerializer(serializers.ModelSerializer):
+    user = UserDetailSerializer()
+    profile_pic = serializers.ImageField(source='image', read_only=True)
+
+    class Meta:
+        model = UserProfile
+        fields = ['id', 'profile_pic', 'user']
+
+
+class UserFollowSerializer(serializers.ModelSerializer):
+    following = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserProfile
+        fields = ('user', 'following')
+
+    def get_following(self, obj):
+        user_followings = ProfileFollowerSerializer(obj.user.following.all(), many=True)
+        print(obj.user.following.count())
+        return user_followings.data
 
 class TokenSerializer(serializers.Serializer):
     token = serializers.CharField()

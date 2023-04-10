@@ -1,30 +1,21 @@
-from django.contrib.auth import authenticate
 from django.db.models import Q
-from rest_framework import serializers, generics, viewsets
+from rest_framework import serializers, generics, viewsets, mixins, status
 from django.shortcuts import get_object_or_404
-from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 
 from rest_framework.authentication import BasicAuthentication, TokenAuthentication
 from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, UpdateModelMixin, ListModelMixin
-from rest_framework.permissions import IsAdminUser, AllowAny
+from rest_framework.permissions import IsAdminUser
 from rest_framework.permissions import IsAuthenticated
-from rest_framework_simplejwt.tokens import RefreshToken
-
 from account.serializers import UserRegisterSerializer, UserLogInSerializer, UserChangePasswordSerializer, \
     DeleteUserSerializer, ProfileSerializer, UserSearchSerializer, FollowingSerializer, FollowersSerializer, \
-    UserProfileOTPSerializer, TokenSerializer, ForgotPasswordOTPSerializer, ForgotPasswordSerializer, \
-    UserProfileSerializer
+    UserProfileOTPSerializer, ForgotPasswordOTPSerializer, ForgotPasswordSerializer, \
+    UserProfileSerializer, UserFollowSerializer, UserSerializer, VerifyOTPSerializer
 from post.utils import get_tokens_for_user
 from django.contrib.auth.models import User
-from rest_framework import mixins, status
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.response import Response
 from .models import UserProfile
-from .serializers import VerifyOTPSerializer
-
-from .serializers import UserSerializer
-
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 
@@ -62,15 +53,14 @@ class UserLogIn(GenericViewSet, CreateModelMixin):
             username_or_email = request.data.get('username')
             password = request.data.get('password')
             user = User.objects.filter(Q(email=username_or_email) | Q(username=username_or_email)).first()
-            print(user)
-
-            # user = authenticate(**data)
             if not user:
                 raise serializers.ValidationError("No such user found. Register First!")
             if user.check_password(password) and user.is_active:
                 user_token = get_tokens_for_user(user)
+                user_id = user.id
 
                 return Response({'token': user_token,
+                                 'user_id': user_id,
                                  "data": serializer.data,
                                  'message': "Successfully Logged In",
                                  }, status=status.HTTP_200_OK)
@@ -79,7 +69,7 @@ class UserLogIn(GenericViewSet, CreateModelMixin):
                     'message': "Account is inactive",
                 }, status=status.HTTP_401_UNAUTHORIZED)
         return Response({
-            'data': serializer.errors}, status=status.HTTP_404_NOT_FOUND)
+            'error': "Invalid credentials"}, status=status.HTTP_404_NOT_FOUND)
 
 
 class UserChangePassword(GenericViewSet, UpdateModelMixin):
@@ -126,8 +116,14 @@ class DeleteUser(GenericViewSet, DestroyModelMixin):
 
 class UserView(GenericViewSet, ListModelMixin):
     """View to get post of the users followed by user"""
-    queryset = User.objects.all()
+    queryset = User
     serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = User.objects.filter(id=user.id)
+        return queryset
 
 
 
@@ -214,6 +210,37 @@ class GenerateOTPView(generics.GenericAPIView, mixins.UpdateModelMixin):
         return Response({'message': 'OTP Sent successfully'},
                         status=status.HTTP_200_OK)
 
+
+class UserFollowView(mixins.CreateModelMixin, GenericViewSet, mixins.DestroyModelMixin):
+    serializer_class = UserFollowSerializer
+    queryset = User.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        user_id = request.data.get('user_id')
+        if not user_id:
+            return Response({'error': 'Please enter valid user id'}, status=status.HTTP_400_BAD_REQUEST)
+        user_to_follow = get_object_or_404(User, id=user_id)
+        if request.user == user_to_follow:
+            return Response({'error': 'You cannot follow himself'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            profile = user_to_follow.userprofile
+        except UserProfile.DoesNotExist:
+            UserProfile.objects.create(user=user_to_follow)
+        try:
+            profile = self.request.user.userprofile
+        except UserProfile.DoesNotExist:
+            UserProfile.objects.create(user=self.request.user)
+        user_to_follow.userprofile.followers.add(request.user)
+        serializer = self.get_serializer(request.user.userprofile)
+        print(request.user.following.count())
+        return Response({'message': f'now {self.request.user.username} is following {user_to_follow.username}',
+                         'data': serializer.data}, status=status.HTTP_201_CREATED)
+
+    def destroy(self, request, pk=None):
+        user_to_unfollow = get_object_or_404(User, id=pk)
+        user_to_unfollow.userprofile.followers.remove(request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class LogoutViewSet(viewsets.ViewSet):
     authentication_classes = [TokenAuthentication]
@@ -316,3 +343,4 @@ class ForgotPassword(GenericViewSet, UpdateModelMixin):
 
 class UserProfileIdView(generics.CreateAPIView):
     serializer_class = UserProfileSerializer
+

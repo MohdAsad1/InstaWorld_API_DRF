@@ -21,7 +21,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         exclude = ['password', 'is_active', 'is_staff', 'last_login', 'is_superuser', 'date_joined',
-                   'groups', 'user_permissions']
+                   'groups', 'user_permissions', "email"]
 
 
 class PostSerializers(serializers.ModelSerializer):
@@ -153,6 +153,7 @@ class PostCommentSerializer(serializers.ModelSerializer):
         model = Post
         fields = ('user', 'comments', 'post_description')
 
+
     def get_comments(self, obj):
         comments = obj.comments.all().values('comment', 'created_at', 'user__username', 'user__userprofile__image')
         return [
@@ -169,9 +170,18 @@ class PostCommentSerializer(serializers.ModelSerializer):
         ]
 
 
+class SearchFeedPostSerializer(serializers.ModelSerializer):
+    images = ImageSerializer(many=True, required=False)
+
+    class Meta:
+        model = Post
+        fields = ["id", "images"]
+
+
 class CreateCommentSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
 
     class Meta:
         model = Comment
         fields = ('comment', 'user')
+
