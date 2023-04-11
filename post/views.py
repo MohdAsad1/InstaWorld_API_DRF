@@ -91,9 +91,8 @@ class PostLikeView(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateMod
         return Response(serializers.data)
 
     def create(self, request, *args, **kwargs):
-        user = self.request.POST["user"]
+        user = self.request.user
         post = self.request.POST["post"]
-        user = User.objects.get(id=user)
         post = Post.objects.get(id=post)
         post.likes.add(user)
         post.save()
@@ -112,9 +111,8 @@ class PostSaveView(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateMod
         return Response(serializers.data)
 
     def create(self, request, *args, **kwargs):
-        user = self.request.POST["user"]
+        user = self.request.user
         post = self.request.POST["post"]
-        user = User.objects.get(id=user)
         post = Post.objects.get(id=post)
         post.saved_by.add(user)
         post.save()
@@ -146,14 +144,10 @@ class CreateCommentView(GenericViewSet, CreateModelMixin):
 
     def create(self, request, *args, **kwargs):
         comment = self.request.POST["comment"]
-        user = self.request.POST["user"]
+        user = self.request.user
         post = self.request.POST["post"]
-        create = Comment()
-        user = User.objects.get(id=user)
         post = Post.objects.get(id=post)
-        create.comment = comment
-        create.user = user
-        create.save()
-        post.comments.add(create)
+        create_comment = Comment.objects.create(user=user, comment=comment)
+        post.comments.add(create_comment)
         post.save()
-        return Response(CreateCommentSerializer(create).data)
+        return Response(CreateCommentSerializer(create_comment).data)

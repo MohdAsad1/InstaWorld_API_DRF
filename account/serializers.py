@@ -364,3 +364,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return user_profile
         except User.DoesNotExist:
             raise serializers.ValidationError('User does not exist.')
+
+
+class ProfileListSerializer(ProfileSerializer):
+    class Meta:
+        model = UserProfile
+        exclude = ('followers', 'otp', 'otp_at')
