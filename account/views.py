@@ -10,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from account.serializers import UserRegisterSerializer, UserLogInSerializer, UserChangePasswordSerializer, \
     DeleteUserSerializer, ProfileSerializer, UserSearchSerializer, FollowingSerializer, FollowersSerializer, \
     UserProfileOTPSerializer, ForgotPasswordOTPSerializer, ForgotPasswordSerializer, \
-    UserProfileSerializer, UserFollowSerializer, UserSerializer, VerifyOTPSerializer
+    UserProfileSerializer, UserFollowSerializer, UserSerializer, VerifyOTPSerializer, ProfileListSerializer
 from post.utils import get_tokens_for_user
 from django.contrib.auth.models import User
 from rest_framework.viewsets import GenericViewSet
@@ -344,3 +344,12 @@ class ForgotPassword(GenericViewSet, UpdateModelMixin):
 class UserProfileIdView(generics.CreateAPIView):
     serializer_class = UserProfileSerializer
 
+
+class ProfileListView(GenericViewSet, ListModelMixin):
+    serializers_class = ProfileListSerializer
+    queryset = UserProfile.objects.all()
+
+    def list(self, request, *args, **kwargs):
+        user = self.request.query_params.get('user_id')
+        serializer = ProfileListSerializer(UserProfile.objects.filter(user__id=user), many=True)
+        return Response(serializer.data)
