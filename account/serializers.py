@@ -252,15 +252,6 @@ class TokenSerializer(serializers.Serializer):
     token = serializers.CharField()
 
 
-# class UserFollowSerializer(serializers.ModelSerializer):
-#     # following = UserSerializer(read_only=True, many=True)
-#     followers = UserSerializer(read_only=True, many=True)
-#
-#     class Meta:
-#         model = UserProfile
-#         fields = ('user', 'followers')
-
-
 class ForgotPasswordOTPSerializer(serializers.ModelSerializer):
     username = serializers.CharField(required=True)
     phone_number = serializers.CharField(required=False)
@@ -319,7 +310,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserProfile
-        fields = ('id', 'username', 'user', 'profile', 'phone_number',)
+        fields = ('id', 'username', 'user', 'profile', 'phone_number', 'image')
 
     def create(self, validated_data):
         username = validated_data.pop('username')
