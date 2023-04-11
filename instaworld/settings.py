@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework.authtoken',
     'account',
     'post',
     'chat',
@@ -88,18 +89,23 @@ ASGI_APPLICATION = 'instaworld.asgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'instaworld',
-        'USER': 'postgres',
-        'PASSWORD': 'root',
+        'NAME': 'insta_world_db',
+        'USER': 'instaworld',
+        'PASSWORD': 'instaworld',
         'HOST': 'localhost',
         'PORT': 5432,
     }
 }
+
+
 REST_FRAMEWORK = {
+    'AUTHENTICATION_CLASSES': 'rest_framework.authentication.TokenAuthentication',
+    # 'EXCEPTION_HANDLER': 'myapp.views.custom_exception_handler',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 12,
 
     'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.TokenAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     )}
 

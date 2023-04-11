@@ -1,9 +1,11 @@
+from django.contrib.auth import logout
 from django.db.models import Q
 from rest_framework import serializers, generics, viewsets, mixins, status
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from rest_framework.authentication import BasicAuthentication, TokenAuthentication
+from rest_framework.authentication import BasicAuthentication
 from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, UpdateModelMixin, ListModelMixin
 from rest_framework.permissions import IsAdminUser
 from rest_framework.permissions import IsAuthenticated
@@ -126,15 +128,18 @@ class UserView(GenericViewSet, ListModelMixin):
         return queryset
 
 
-
 class ProfileAPI(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixin, mixins.RetrieveModelMixin,
                  mixins.UpdateModelMixin, mixins.DestroyModelMixin):
     serializer_class = ProfileSerializer
-    queryset = UserProfile.objects.all()
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
 
     def get_queryset(self):
         user = self.request.user
-        return UserProfile.objects.filter(user=user)
+        if user.is_authenticated:
+            return UserProfile.objects.filter(user=user)
+        else:
+            return UserProfile.objects.none()
 
 
 class FollowerViewSet(GenericViewSet, ListModelMixin):
@@ -242,55 +247,6 @@ class UserFollowView(mixins.CreateModelMixin, GenericViewSet, mixins.DestroyMode
         user_to_unfollow.userprofile.followers.remove(request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-class LogoutViewSet(viewsets.ViewSet):
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def create(self, request):
-        if not request.user.is_authenticated:
-            raise AuthenticationFailed(detail='Authentication credentials were not provided.')
-
-        # delete the user's authentication token
-        Token.objects.filter(user=request.user).delete()
-
-        # return a success response
-        return Response({'detail': 'Successfully logged out.'})
-
-# class FollowViewSet(mixins.CreateModelMixin, GenericViewSet, mixins.ListModelMixin, mixins.DestroyModelMixin):
-#     serializer_class = UserFollowSerializer
-#     queryset = User.objects.all()
-#     permission_classes = [IsAuthenticated]
-#
-#     def create(self, request, *args, **kwargs):
-#         user_id = request.data.get('user')
-#         if not user_id:
-#             return Response({'error': 'Please enter valid user id'}, status=status.HTTP_400_BAD_REQUEST)
-#         user_to_follow = get_object_or_404(User, id=user_id)
-#         if request.user == user_to_follow:
-#             return Response({'error': 'You cannot follow himself'}, status=status.HTTP_400_BAD_REQUEST)
-#         try:
-#             profile = user_to_follow.userprofile
-#         except UserProfile.DoesNotExist:
-#             UserProfile.objects.create(user=user_to_follow)
-#
-#         # if request.user.userprofile is None:
-#         #     UserProfile.objects.create(user=self.request.user)
-#         try:
-#             profile = self.request.user.userprofile
-#         except UserProfile.DoesNotExist:
-#             UserProfile.objects.create(user=self.request.user)
-#         profile=UserProfile.objects.get(user=request.user)
-#         user_to_follow.userprofile.followers.add(request.user)
-#         serializer = self.get_serializer(request.user.userprofile)
-#         return Response({'message': f'now {self.request.user.username} is following {user_to_follow.username}',
-#                          'data': serializer.data}, status=status.HTTP_201_CREATED)
-#
-#     def destroy(self, request, pk=None):
-#         user_to_unfollow = get_object_or_404(User, id=pk)
-#         request.user.userprofile.user.following.remove(user_to_unfollow)
-#         user_to_unfollow.userprofile.followers.remove(request.user)
-#         return Response(status=status.HTTP_204_NO_CONTENT)
-
 
 class ForgotPasswordOTPView(generics.GenericAPIView, mixins.UpdateModelMixin):
     serializer_class = ForgotPasswordOTPSerializer
@@ -353,3 +309,24 @@ class ProfileListView(GenericViewSet, ListModelMixin):
         user = self.request.query_params.get('user_id')
         serializer = ProfileListSerializer(UserProfile.objects.filter(user__id=user), many=True)
         return Response(serializer.data)
+
+
+class UserLogoutView(mixins.DestroyModelMixin, generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def delete(self, request, *args, **kwargs):
+        try:
+            auth_token = Token.objects.get(user=request.user)
+            auth_token.delete()
+            request.user.auth_token.delete()
+        except Token.DoesNotExist:
+            pass
+
+        self.logout(request)
+        return Response({'detail': 'User logged out successfully'})
+
+    def logout(self, request):
+        self.request.session.flush()
+        self.request.user.authenticated = False
+        logout(request)

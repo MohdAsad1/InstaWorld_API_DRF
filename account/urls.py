@@ -4,8 +4,8 @@ from django.conf.urls.static import static
 from account import views
 from rest_framework.routers import DefaultRouter
 
-from account.views import VerifyOTPView, ProfileAPI, GenerateOTPView, LogoutViewSet, ForgotPasswordOTPView, \
-    UserProfileIdView, ForgotPassword
+from account.views import VerifyOTPView, ProfileAPI, GenerateOTPView, ForgotPasswordOTPView, \
+    UserProfileIdView, ForgotPassword, UserLogoutView
 
 router = DefaultRouter()
 
@@ -19,7 +19,6 @@ router.register(r'profile', ProfileAPI, basename='profile')
 router.register(r'follow', views.UserFollowView, basename='follow')
 router.register('get_followers_list', views.FollowerViewSet, basename='get_followers_list')
 router.register('get_following_list', views.FollowingViewSet, basename='get_following_list')
-router.register('logout', LogoutViewSet, basename='logout')
 router.register('forgot_password', ForgotPassword, basename='forgot_password')
 router.register('particular_user_profile', views.ProfileListView, basename='particular_user_profile')
 
@@ -29,6 +28,7 @@ urlpatterns = [
     path('generate_otp/<int:pk>/', GenerateOTPView.as_view(), name='generate_otp'),
     path('forgot_password_send_otp/<int:pk>/', ForgotPasswordOTPView.as_view(), name='forgot_password_send_otp'),
     path('forget_password_username/', UserProfileIdView.as_view(), name='forget_password_username'),
+    path('logout/', UserLogoutView.as_view(), name='logout'),
     path('', include(router.urls))
 ]
 
