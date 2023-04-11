@@ -5,10 +5,9 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, \
     DestroyModelMixin, RetrieveModelMixin
 from rest_framework_simplejwt.tokens import RefreshToken
-
 from post.models import Post, Comment
 from post.serializers import PostSerializers, UserFollowersPostSerializer, PostSavedSerializer, PostListSerializer, \
-    PostLikeSerializer, PostSaveSerializer, PostCommentSerializer, CreateCommentSerializer
+    PostLikeSerializer, PostSaveSerializer, PostCommentSerializer, CreateCommentSerializer, SearchFeedPostSerializer
 
 
 def get_tokens_for_user(user):
@@ -92,9 +91,8 @@ class PostLikeView(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateMod
         return Response(serializers.data)
 
     def create(self, request, *args, **kwargs):
-        user = self.request.POST["user"]
+        user = self.request.user
         post = self.request.POST["post"]
-        user = User.objects.get(id=user)
         post = Post.objects.get(id=post)
         post.likes.add(user)
         post.save()
@@ -113,9 +111,8 @@ class PostSaveView(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateMod
         return Response(serializers.data)
 
     def create(self, request, *args, **kwargs):
-        user = self.request.POST["user"]
+        user = self.request.user
         post = self.request.POST["post"]
-        user = User.objects.get(id=user)
         post = Post.objects.get(id=post)
         post.saved_by.add(user)
         post.save()
@@ -131,6 +128,15 @@ class PostCommentView(GenericViewSet, ListModelMixin, RetrieveModelMixin, Create
         serializers = PostCommentSerializer(Post.objects.filter(id=id), many=True)
         return Response(serializers.data)
 
+class SearchFeedPost(GenericViewSet, ListModelMixin):
+    serializer_class = SearchFeedPostSerializer
+    queryset = Post
+
+    def get_queryset(self):
+        followers = self.request.user.userprofile.followers.all()
+        users_to_exclude = [follower for follower in followers]
+        return Post.objects.exclude(user__in=users_to_exclude).order_by("?")
+
 
 class CreateCommentView(GenericViewSet, CreateModelMixin):
     serializer_class = CreateCommentSerializer
@@ -138,14 +144,10 @@ class CreateCommentView(GenericViewSet, CreateModelMixin):
 
     def create(self, request, *args, **kwargs):
         comment = self.request.POST["comment"]
-        user = self.request.POST["user"]
+        user = self.request.user
         post = self.request.POST["post"]
-        create = Comment()
-        user = User.objects.get(id=user)
         post = Post.objects.get(id=post)
-        create.comment = comment
-        create.user = user
-        create.save()
-        post.comments.add(create)
+        create_comment = Comment.objects.create(user=user, comment=comment)
+        post.comments.add(create_comment)
         post.save()
-        return Response(CreateCommentSerializer(create).data)
+        return Response(CreateCommentSerializer(create_comment).data)
