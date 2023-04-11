@@ -54,9 +54,10 @@ class PostSerializers(serializers.ModelSerializer):
     def create(self, validated_data):
         images_data = self.context.get('request').FILES.getlist('images', [])
         videos_data = self.context.get('request').FILES.getlist('videos', [])
+        print(images_data)
 
         post = Post.objects.create(**validated_data, user=self.context['request'].user)
-
+        print(post)
         images = []
         videos = []
 
@@ -69,6 +70,8 @@ class PostSerializers(serializers.ModelSerializer):
             video = Video.objects.create(video=video_data)
             videos.append(video)
         post.videos.set(videos)
+
+        print(post)
 
         return post
 
@@ -138,6 +141,8 @@ class PostSavedSerializer(PostSerializers):
 
 
 class PostSaveSerializer(serializers.ModelSerializer):
+    images = ImageSerializer(many=True, required=False)
+    videos = VideoSerializer(many=True, required=False)
     user = UserSerializer(read_only=True)
 
     class Meta:
@@ -152,7 +157,6 @@ class PostCommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = ('user', 'comments', 'post_description')
-
 
     def get_comments(self, obj):
         comments = obj.comments.all().values('comment', 'created_at', 'user__username', 'user__userprofile__image')
@@ -184,4 +188,3 @@ class CreateCommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ('comment', 'user')
-

@@ -7,6 +7,8 @@ from rest_framework import serializers
 import re
 import sys
 
+from post.models import Post
+
 sys.path.append("..")
 from .models import UserProfile
 
@@ -59,7 +61,7 @@ class UserRegisterSerializer(serializers.ModelSerializer):
         if not any(char.isalpha() for char in value):
             raise serializers.ValidationError("Username should contain at least one alphabet.")
         if User.objects.filter(username=value).exists():
-            raise  serializers.ValidationError("Username already exist")
+            raise serializers.ValidationError("Username already exist")
         return value
 
     def validate_first_name(self, value):
@@ -136,9 +138,6 @@ class DeleteUserSerializer(serializers.ModelSerializer):
 
 
 class UserSearchSerializer(serializers.ModelSerializer):
-    """
-    Serializer for showing post of the follower user follow
-    """
     profile_pic = serializers.ImageField(source='userprofile.image', read_only=True)
 
     class Meta:
@@ -159,6 +158,10 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     def get_following_count(self, obj):
         return obj.user.following.count()
+
+    def get_post_count(self, obj):
+        post_count = Post.objects.filter(user=obj.user).count()
+        return post_count
 
 
 class FollowersSerializer(serializers.ModelSerializer):
@@ -278,17 +281,9 @@ class UserFollowSerializer(serializers.ModelSerializer):
         print(obj.user.following.count())
         return user_followings.data
 
+
 class TokenSerializer(serializers.Serializer):
     token = serializers.CharField()
-
-
-# class UserFollowSerializer(serializers.ModelSerializer):
-#     # following = UserSerializer(read_only=True, many=True)
-#     followers = UserSerializer(read_only=True, many=True)
-#
-#     class Meta:
-#         model = UserProfile
-#         fields = ('user', 'followers')
 
 
 class ForgotPasswordOTPSerializer(serializers.ModelSerializer):
@@ -349,7 +344,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserProfile
-        fields = ('id', 'username', 'user', 'profile', 'phone_number',)
+        fields = ('id', 'username', 'user', 'profile', 'phone_number', 'image')
 
     def create(self, validated_data):
         username = validated_data.pop('username')
@@ -360,12 +355,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
         except User.DoesNotExist:
             raise serializers.ValidationError('User does not exist.')
 
-#
-# class TokenRefreshSerializer(serializers.Serializer):
-#     refresh_token = serializers.CharField()
-
 
 class ProfileListSerializer(ProfileSerializer):
+    user = UserSerializer(read_only=True)
+    post_count = serializers.SerializerMethodField()
+
+    def get_post_count(self, obj):
+        post_count = Post.objects.filter(user=obj.user).count()
+        return post_count
     class Meta:
         model = UserProfile
         exclude = ('followers', 'otp', 'otp_at')

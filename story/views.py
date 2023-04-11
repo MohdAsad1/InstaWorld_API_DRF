@@ -1,12 +1,10 @@
 from django.contrib.auth.models import User
 from django.db.models import Q
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import CreateModelMixin, ListModelMixin, UpdateModelMixin, DestroyModelMixin
-
-from account.models import UserProfile
 from .models import Story
 from django.utils import timezone
 
@@ -67,5 +65,3 @@ class HighlightStoryView(GenericViewSet, ListModelMixin, UpdateModelMixin):
             story.is_highlighted = False
         story.save()
         return Response({'message': 'Stories highlighted successfully'}, status=status.HTTP_200_OK)
-
-

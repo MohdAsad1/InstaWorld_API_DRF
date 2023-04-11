@@ -1,9 +1,11 @@
+from django.contrib.auth import logout
 from django.db.models import Q
-from rest_framework import serializers, generics, viewsets, mixins, status
+from rest_framework import serializers, generics, viewsets, mixins, status, filters
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from rest_framework.authentication import BasicAuthentication, TokenAuthentication
+from rest_framework.authentication import BasicAuthentication
 from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, UpdateModelMixin, ListModelMixin
 from rest_framework.permissions import IsAdminUser
 from rest_framework.permissions import IsAuthenticated
@@ -132,15 +134,18 @@ class UserView(GenericViewSet, ListModelMixin, UpdateModelMixin):
         serializer.save()
         return Response(serializer.data)
 
-
 class ProfileAPI(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixin, mixins.RetrieveModelMixin,
                  mixins.UpdateModelMixin, mixins.DestroyModelMixin):
     serializer_class = ProfileSerializer
-    queryset = UserProfile.objects.all()
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
 
     def get_queryset(self):
         user = self.request.user
-        return UserProfile.objects.filter(user=user)
+        if user.is_authenticated:
+            return UserProfile.objects.filter(user=user)
+        else:
+            return UserProfile.objects.none()
 
 
 class FollowerViewSet(GenericViewSet, ListModelMixin):
@@ -188,6 +193,8 @@ class VerifyOTPView(APIView):
 
 class UserSearchView(GenericViewSet):
     serializer_class = UserSearchSerializer
+    # filter_backends = [filters.SearchFilter]
+    # search_fields = ['^username', '^first_name', '^last_name']
 
     def list(self, request, *args, **kwargs):
         search = request.query_params.get('search')
@@ -239,21 +246,6 @@ class UserFollowView(mixins.CreateModelMixin, GenericViewSet, mixins.DestroyMode
             serializer = self.get_serializer(request.user.userprofile)
             return Response({'message': f'You are now following {user_to_follow.username}.',
                              'data': serializer.data}, status=status.HTTP_201_CREATED)
-
-
-class LogoutViewSet(viewsets.ViewSet):
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def create(self, request):
-        if not request.user.is_authenticated:
-            raise AuthenticationFailed(detail='Authentication credentials were not provided.')
-
-        # delete the user's authentication token
-        Token.objects.filter(user=request.user).delete()
-
-        # return a success response
-        return Response({'detail': 'Successfully logged out.'})
 
 
 class ForgotPasswordOTPView(generics.GenericAPIView, mixins.UpdateModelMixin):
@@ -309,68 +301,32 @@ class UserProfileIdView(generics.CreateAPIView):
     serializer_class = UserProfileSerializer
 
 
-# class TokenRefreshViewSet(GenericViewSet, UpdateModelMixin):
-#     serializer_class = TokenRefreshSerializer
-#
-#     # def update(self, request, *args, **kwargs):
-#     #     """
-#     #     Refreshes an access token using a refresh token.
-#     #     """
-#     #     serializer = self.get_serializer(data=request.data)
-#     #     serializer.is_valid(raise_exception=True)
-#     #
-#     #     refresh_token = serializer.validated_data['refresh_token']
-#     #
-#     #     if not refresh_token:
-#     #         return Response({'error': 'refresh_token field is required.'}, status=status.HTTP_400_BAD_REQUEST)
-#     #
-#     #     from rest_framework.authtoken.models import Token
-#     #
-#     #     try:
-#     #         token = Token.objects.get(key=refresh_token)
-#     #     except Token.DoesNotExist:
-#     #         return Response({'error': 'Invalid refresh token.'}, status=status.HTTP_400_BAD_REQUEST)
-#     #
-#     #     user = token.user
-#     #     new_token, created = Token.objects.get_or_create(user=user)
-#     #
-#     #     return Response({'access_token': new_token.key}, status=status.HTTP_200_OK)
-#     @action(detail=False, methods=['post'])
-#     def refresh_token(self, request):
-#         """
-#         Refreshes an access token using a refresh token.
-#         """
-#         serializer = self.get_serializer(data=request.data)
-#         serializer.is_valid(raise_exception=True)
-#
-#         refresh_token = serializer.validated_data['refresh_token']
-#
-#         if not refresh_token:
-#             return Response({'error': 'refresh_token field is required.'}, status=status.HTTP_400_BAD_REQUEST)
-#
-#         # Your logic to verify the refresh token and generate a new access token using the refresh token.
-#         # For example, you could use the Django's built-in token authentication:
-#
-#         from rest_framework.authtoken.models import Token
-#
-#         try:
-#             token = Token.objects.get(key=refresh_token)
-#         except:
-#             return Response({'error': 'Invalid refresh token.'}, status=status.HTTP_400_BAD_REQUEST)
-#
-#         user = token.user
-#         new_token, created = Token.objects.get_or_create(user=user)
-#
-#         return Response({'access_token': new_token.key}, status=status.HTTP_200_OK)
-
-
 class ProfileListView(GenericViewSet, ListModelMixin):
     serializers_class = ProfileListSerializer
     queryset = UserProfile.objects.all()
 
-    def list(self, request, args, *kwargs):
+    def list(self, request, *args, **kwargs):
         user = self.request.query_params.get('user_id')
         serializer = ProfileListSerializer(UserProfile.objects.filter(user__id=user), many=True)
         return Response(serializer.data)
 
 
+class UserLogoutView(mixins.DestroyModelMixin, generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def delete(self, request, *args, **kwargs):
+        try:
+            auth_token = Token.objects.get(user=request.user)
+            auth_token.delete()
+            request.user.auth_token.delete()
+        except Token.DoesNotExist:
+            pass
+
+        self.logout(request)
+        return Response({'detail': 'User logged out successfully'})
+
+    def logout(self, request):
+        self.request.session.flush()
+        self.request.user.authenticated = False
+        logout(request)
