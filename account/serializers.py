@@ -1,7 +1,7 @@
 import string
 from datetime import timezone, datetime
 from random import random
-
+from post.models import Post
 from django.contrib.auth.models import User
 from rest_framework import serializers
 import re
@@ -154,6 +154,7 @@ class UserSearchSerializer(serializers.ModelSerializer):
 class ProfileSerializer(serializers.ModelSerializer):
     follower_count = serializers.SerializerMethodField()
     following_count = serializers.SerializerMethodField()
+    post_count = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
@@ -164,6 +165,10 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     def get_following_count(self, obj):
         return obj.user.following.count()
+
+    def get_post_count(self, obj):
+        post_count = Post.objects.filter(user=obj.user).count()
+        return post_count
 
 
 class FollowersSerializer(serializers.ModelSerializer):
@@ -296,6 +301,20 @@ class UserFollowSerializer(serializers.ModelSerializer):
         return user_followings.data
 
 
+class TokenSerializer(serializers.Serializer):
+    token = serializers.CharField()
+
+
+# class UserFollowSerializer(serializers.ModelSerializer):
+#     # following = UserSerializer(read_only=True, many=True)
+#     followers = UserSerializer(read_only=True, many=True)
+#
+#     class Meta:
+#         model = UserProfile
+#         fields = ('user', 'followers')
+
+
+
 class ForgotPasswordOTPSerializer(serializers.ModelSerializer):
     username = serializers.CharField(required=True)
     phone_number = serializers.CharField(required=False)
@@ -367,6 +386,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 
 class ProfileListSerializer(ProfileSerializer):
+    user = UserSerializer(read_only=True)
+    post_count = serializers.SerializerMethodField()
+
+    def get_post_count(self, obj):
+        post_count = Post.objects.filter(user=obj.user).count()
+        return post_count
+
     class Meta:
         model = UserProfile
         exclude = ('followers', 'otp', 'otp_at')

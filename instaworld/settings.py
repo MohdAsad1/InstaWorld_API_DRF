@@ -89,7 +89,11 @@ ASGI_APPLICATION = 'instaworld.asgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
+<<<<<<< Updated upstream
         'NAME': 'insta_world_db',
+=======
+        'NAME': 'instaworld_db',
+>>>>>>> Stashed changes
         'USER': 'instaworld',
         'PASSWORD': 'instaworld',
         'HOST': 'localhost',
