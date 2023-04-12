@@ -94,9 +94,12 @@ class PostLikeView(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateMod
         user = self.request.user
         post = self.request.POST["post"]
         post = Post.objects.get(id=post)
-        post.likes.add(user)
-        post.save()
-        return Response(PostLikeSerializer(post).data)
+        if user in post.likes.all():
+            post.likes.remove(user)
+            return Response(False)
+        else:
+            post.likes.add(user)
+            return Response(True)
 
 
 class PostSaveView(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateModelMixin):
@@ -114,9 +117,13 @@ class PostSaveView(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateMod
         user = self.request.user
         post = self.request.POST["post"]
         post = Post.objects.get(id=post)
-        post.saved_by.add(user)
-        post.save()
-        return Response(PostSaveSerializer(post).data)
+        if user in post.saved_by.all():
+            post.saved_by.remove(user)
+            return Response(False)
+        else:
+            post.saved_by.add(user)
+            return Response(True)
+
 
 
 class PostCommentView(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateModelMixin):
@@ -127,6 +134,7 @@ class PostCommentView(GenericViewSet, ListModelMixin, RetrieveModelMixin, Create
         id = self.request.query_params.get('post_id')
         serializers = PostCommentSerializer(Post.objects.filter(id=id), many=True)
         return Response(serializers.data)
+
 
 class SearchFeedPost(GenericViewSet, ListModelMixin):
     serializer_class = SearchFeedPostSerializer

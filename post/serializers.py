@@ -24,7 +24,14 @@ class UserSerializer(serializers.ModelSerializer):
                    'groups', 'user_permissions', "email"]
 
 
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ('image',)
+
+
 class PostSerializers(serializers.ModelSerializer):
+    user_profile = UserProfileSerializer(source='user.userprofile', read_only=True)
     likes_count = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
     has_liked = serializers.SerializerMethodField()
@@ -71,12 +78,6 @@ class PostSerializers(serializers.ModelSerializer):
         post.videos.set(videos)
 
         return post
-
-
-class UserProfileSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = UserProfile
-        fields = ('image',)
 
 
 class PostLikeSerializer(serializers.ModelSerializer):
@@ -138,6 +139,8 @@ class PostSavedSerializer(PostSerializers):
 
 
 class PostSaveSerializer(serializers.ModelSerializer):
+    images = ImageSerializer(many=True, required=False)
+    videos = VideoSerializer(many=True, required=False)
     user = UserSerializer(read_only=True)
 
     class Meta:
@@ -152,7 +155,6 @@ class PostCommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = ('user', 'comments', 'post_description')
-
 
     def get_comments(self, obj):
         comments = obj.comments.all().values('comment', 'created_at', 'user__username', 'user__userprofile__image')
@@ -184,4 +186,3 @@ class CreateCommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ('comment', 'user')
-

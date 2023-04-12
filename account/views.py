@@ -250,6 +250,60 @@ class UserFollowView(mixins.CreateModelMixin, GenericViewSet, mixins.DestroyMode
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+
+
+class LogoutViewSet(viewsets.ViewSet):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request):
+        if not request.user.is_authenticated:
+            raise AuthenticationFailed(detail='Authentication credentials were not provided.')
+
+        # delete the user's authentication token
+        Token.objects.filter(user=request.user).delete()
+
+        # return a success response
+        return Response({'detail': 'Successfully logged out.'})
+
+
+# class FollowViewSet(mixins.CreateModelMixin, GenericViewSet, mixins.ListModelMixin, mixins.DestroyModelMixin):
+#     serializer_class = UserFollowSerializer
+#     queryset = User.objects.all()
+#     permission_classes = [IsAuthenticated]
+#
+#     def create(self, request, *args, **kwargs):
+#         user_id = request.data.get('user')
+#         if not user_id:
+#             return Response({'error': 'Please enter valid user id'}, status=status.HTTP_400_BAD_REQUEST)
+#         user_to_follow = get_object_or_404(User, id=user_id)
+#         if request.user == user_to_follow:
+#             return Response({'error': 'You cannot follow himself'}, status=status.HTTP_400_BAD_REQUEST)
+#         try:
+#             profile = user_to_follow.userprofile
+#         except UserProfile.DoesNotExist:
+#             UserProfile.objects.create(user=user_to_follow)
+#
+#         # if request.user.userprofile is None:
+#         #     UserProfile.objects.create(user=self.request.user)
+#         try:
+#             profile = self.request.user.userprofile
+#         except UserProfile.DoesNotExist:
+#             UserProfile.objects.create(user=self.request.user)
+#         profile=UserProfile.objects.get(user=request.user)
+#         user_to_follow.userprofile.followers.add(request.user)
+#         serializer = self.get_serializer(request.user.userprofile)
+#         return Response({'message': f'now {self.request.user.username} is following {user_to_follow.username}',
+#                          'data': serializer.data}, status=status.HTTP_201_CREATED)
+#
+#     def destroy(self, request, pk=None):
+#         user_to_unfollow = get_object_or_404(User, id=pk)
+#         request.user.userprofile.user.following.remove(user_to_unfollow)
+#         user_to_unfollow.userprofile.followers.remove(request.user)
+#         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+
 class ForgotPasswordOTPView(generics.GenericAPIView, mixins.UpdateModelMixin):
     serializer_class = ForgotPasswordOTPSerializer
     queryset = UserProfile.objects.all()
