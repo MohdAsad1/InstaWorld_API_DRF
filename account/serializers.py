@@ -250,6 +250,18 @@ class UserProfileOTPSerializer(serializers.ModelSerializer):
         user_profile.save()
         return otp
 
+    def validate_email(self, data):
+        email = data
+        if User.objects.filter(email=email).exists():
+            raise serializers.ValidationError("Email already exists!")
+        return data
+
+    def validate_phone_number(self, data):
+        phone_number = data
+        if UserProfile.objects.filter(phone_number=phone_number).exists():
+            raise serializers.ValidationError("Phone Number already exists!")
+        return data
+
     def validate(self, attrs):
         if not attrs.get('phone_number') and not attrs.get('email'):
             raise serializers.ValidationError("Either phone number or email is required")
@@ -282,10 +294,6 @@ class UserFollowSerializer(serializers.ModelSerializer):
         user_followings = ProfileFollowerSerializer(obj.user.following.all(), many=True)
         print(obj.user.following.count())
         return user_followings.data
-
-
-class TokenSerializer(serializers.Serializer):
-    token = serializers.CharField()
 
 
 class ForgotPasswordOTPSerializer(serializers.ModelSerializer):
@@ -362,3 +370,7 @@ class ProfileListSerializer(ProfileSerializer):
     class Meta:
         model = UserProfile
         exclude = ('followers', 'otp', 'otp_at')
+
+
+class TokenRefreshSerializer(serializers.Serializer):
+    refresh = serializers.CharField()

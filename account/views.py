@@ -2,7 +2,6 @@ from django.contrib.auth import logout
 from django.db.models import Q
 from rest_framework import serializers, generics, viewsets, mixins, status
 from django.shortcuts import get_object_or_404
-from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from rest_framework.authentication import BasicAuthentication
@@ -16,10 +15,13 @@ from account.serializers import UserRegisterSerializer, UserLogInSerializer, Use
 from post.utils import get_tokens_for_user
 from django.contrib.auth.models import User
 from rest_framework.viewsets import GenericViewSet
-from rest_framework.response import Response
 from .models import UserProfile
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
+from rest_framework import permissions
+from rest_framework.response import Response
+from rest_framework_simplejwt.views import TokenRefreshView
+from .serializers import TokenRefreshSerializer
 
 
 class UserRegister(GenericViewSet, CreateModelMixin):
@@ -330,3 +332,16 @@ class UserLogoutView(mixins.DestroyModelMixin, generics.GenericAPIView):
         self.request.session.flush()
         self.request.user.authenticated = False
         logout(request)
+
+
+class TokenRefreshViewset(viewsets.GenericViewSet):
+    permission_classes = (permissions.AllowAny,)
+    serializer_class = TokenRefreshSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        refresh = serializer.validated_data['refresh']
+
+        response = TokenRefreshView.as_view()(request._request)
+        return Response(response.data)
