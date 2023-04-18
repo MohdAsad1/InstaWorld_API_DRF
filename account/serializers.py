@@ -394,7 +394,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 class ProfileListSerializer(ProfileSerializer):
     user = UserSerializer(read_only=True)
-    post_count = serializers.SerializerMethodField()
     is_followed = serializers.SerializerMethodField()
 
     def get_post_count(self, obj):

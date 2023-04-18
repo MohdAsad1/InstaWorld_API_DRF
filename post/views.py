@@ -1,12 +1,9 @@
-from django.contrib.auth.models import User
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, \
     DestroyModelMixin, RetrieveModelMixin
 from rest_framework_simplejwt.tokens import RefreshToken
-
-from account.constants import absolute_url
 from post.models import Post, Comment
 from post.serializers import PostSerializers, UserFollowersPostSerializer, PostSavedSerializer, PostListSerializer, \
     PostLikeSerializer, PostSaveSerializer, PostCommentSerializer, CreateCommentSerializer, SearchFeedPostSerializer
