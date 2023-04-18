@@ -1,10 +1,12 @@
 from django.contrib.auth.models import User
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, \
     DestroyModelMixin, RetrieveModelMixin
 from rest_framework_simplejwt.tokens import RefreshToken
+
+from account.constants import absolute_url
 from post.models import Post, Comment
 from post.serializers import PostSerializers, UserFollowersPostSerializer, PostSavedSerializer, PostListSerializer, \
     PostLikeSerializer, PostSaveSerializer, PostCommentSerializer, CreateCommentSerializer, SearchFeedPostSerializer
@@ -23,11 +25,15 @@ class PostApi(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin
               DestroyModelMixin, RetrieveModelMixin):
     serializer_class = PostSerializers
     queryset = Post.objects.all()
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
         user = self.request.user
-        return Post.objects.filter(user=user)
+        queryset = Post.objects.filter(user=user)
+        post_id = self.request.query_params.get('post_id')
+        if post_id:
+            queryset = Post.objects.filter(pk=post_id)
+        return queryset
 
 
 class AllUserPostApi(GenericViewSet, ListModelMixin):
@@ -75,8 +81,8 @@ class PostListView(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def list(self, request, *args, **kwargs):
         user = self.request.query_params.get('user_id')
         print(user)
-        serializers = PostListSerializer(Post.objects.filter(user__id=user), many=True)
-        return Response(serializers.data)
+        serializer = PostListSerializer(Post.objects.filter(user__id=user), many=True)
+        return Response(serializer.data)
 
 
 class PostLikeView(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateModelMixin):
@@ -86,9 +92,8 @@ class PostLikeView(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateMod
 
     def list(self, request, *args, **kwargs):
         user = self.request.query_params.get('user_id')
-        print(user)
-        serializers = PostListSerializer(Post.objects.filter(likes=user), many=True)
-        return Response(serializers.data)
+        serializer = PostLikeSerializer(Post.objects.filter(likes=user), many=True)
+        return Response(serializer.data)
 
     def create(self, request, *args, **kwargs):
         user = self.request.user
@@ -96,10 +101,14 @@ class PostLikeView(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateMod
         post = Post.objects.get(id=post)
         if user in post.likes.all():
             post.likes.remove(user)
-            return Response(False)
+            serializer = PostLikeSerializer(post)
+            return Response(serializer.data)
         else:
             post.likes.add(user)
-            return Response(True)
+            serializer = PostLikeSerializer(post)
+            response_data = serializer.data
+            return Response(response_data)
+
 
 class PostSaveView(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateModelMixin):
     serializer_class = PostSaveSerializer
@@ -107,18 +116,19 @@ class PostSaveView(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateMod
 
     def list(self, request, *args, **kwargs):
         user = self.request.query_params.get('user_id')
-        print(user)
-        serializers = PostSaveSerializer(Post.objects.filter(saved_by__id=user), many=True)
-        print(serializers)
-        return Response(serializers.data)
+        serializer = PostSaveSerializer(Post.objects.filter(saved_by__id=user), many=True)
+        return Response(serializer.data)
 
     def create(self, request, *args, **kwargs):
         user = self.request.user
         post = self.request.POST["post"]
         post = Post.objects.get(id=post)
-        post.saved_by.add(user)
-        post.save()
-        return Response(PostSaveSerializer(post).data)
+        if user in post.saved_by.all():
+            post.saved_by.remove(user)
+            return Response(False)
+        else:
+            post.saved_by.add(user)
+            return Response(True)
 
 
 class PostCommentView(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateModelMixin):

@@ -22,7 +22,7 @@ class StoryView(GenericViewSet, CreateModelMixin, ListModelMixin, DestroyModelMi
     def get_queryset(self):
         now = timezone.now()
         following_users = User.objects.filter(userprofile__followers=self.request.user)
-        Story.objects.filter(created_at__lte=now - timezone.timedelta(minutes=300)).update(is_archived=True)
+        Story.objects.filter(created_at__lte=now - timezone.timedelta(hours=24)).update(is_archived=True)
         queryset = Story.objects.filter(
             (Q(user=self.request.user) | Q(user__in=following_users)),
             created_at__lt=now,
@@ -41,7 +41,7 @@ class ArchiveStoryView(GenericViewSet, CreateModelMixin, ListModelMixin, Destroy
 
     def get_queryset(self):
         now = timezone.now()
-        Story.objects.filter(created_at__lte=now - timezone.timedelta(minutes=300)).update(is_archived=True)
+        Story.objects.filter(created_at__lte=now - timezone.timedelta(hours=24)).update(is_archived=True)
 
         queryset = Story.objects.filter(user=self.request.user, is_archived=True)
         return queryset

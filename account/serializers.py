@@ -1,13 +1,14 @@
 import string
 from datetime import timezone, datetime
 from random import random
-
+from post.models import Post
 from django.contrib.auth.models import User
 from rest_framework import serializers
 import re
 import sys
 
 from post.models import Post
+from .constants import absolute_url
 
 sys.path.append("..")
 from .models import UserProfile
@@ -21,6 +22,8 @@ from account.utility import send_otp, validate_phone_number, send_otp_on_phone
 
 class UserSerializer(serializers.ModelSerializer):
     """ Serializer for showing post of the follower user follow"""
+
+    profile_pic = serializers.ImageField(source='userprofile.image', read_only=True)
 
     class Meta:
         model = User
@@ -148,6 +151,7 @@ class UserSearchSerializer(serializers.ModelSerializer):
 class ProfileSerializer(serializers.ModelSerializer):
     follower_count = serializers.SerializerMethodField()
     following_count = serializers.SerializerMethodField()
+    post_count = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
@@ -172,20 +176,25 @@ class FollowersSerializer(serializers.ModelSerializer):
         fields = ('followers',)
 
     def get_followers(self, obj):
-        return [{'id': user.id, 'username': user.username, 'profile': {'profile_pic': str(user.userprofile.image)}}
+        request = self.context.get('request')
+        return [{'id': user.id, 'username': user.username,
+                 'profile': {'profile_pic': absolute_url + "/media/" + str(user.userprofile.image)}}
                 for user in obj.followers.all()]
 
 
 class FollowingSerializer(serializers.ModelSerializer):
     following = serializers.SerializerMethodField()
 
-    def get_following(self, obj):
-        return [{'id': user.id, 'username': user.username, 'profile': {'profile_pic': str(user.userprofile.image)}}
-                for user in obj.user.following.all()]
-
     class Meta:
         model = UserProfile
         fields = ('following',)
+
+    def get_following(self, obj):
+        current_user = obj.user
+        request = self.context.get('request')
+        return [{'id': profile.user.id, 'username': profile.user.username,
+                 'profile': {'profile_pic': absolute_url + "/media/" + str(profile.image)}}
+                for profile in current_user.following.all()]
 
 
 User = get_user_model()
@@ -284,14 +293,33 @@ class ProfileFollowerSerializer(serializers.ModelSerializer):
 class UserFollowSerializer(serializers.ModelSerializer):
     following = serializers.SerializerMethodField()
 
+    # has_follow = serializers.SerializerMethodField()
+
     class Meta:
         model = UserProfile
         fields = ('user', 'following')
+
+    # def get_has_follow(self, obj):
+    #     user = self.context['request'].user
+    #     return user.is_authenticated and user.following.filter(pk=obj.id).exists()
 
     def get_following(self, obj):
         user_followings = ProfileFollowerSerializer(obj.user.following.all(), many=True)
         print(obj.user.following.count())
         return user_followings.data
+
+
+class TokenSerializer(serializers.Serializer):
+    token = serializers.CharField()
+
+
+# class UserFollowSerializer(serializers.ModelSerializer):
+#     # following = UserSerializer(read_only=True, many=True)
+#     followers = UserSerializer(read_only=True, many=True)
+#
+#     class Meta:
+#         model = UserProfile
+#         fields = ('user', 'followers')
 
 
 class ForgotPasswordOTPSerializer(serializers.ModelSerializer):
@@ -367,10 +395,19 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class ProfileListSerializer(ProfileSerializer):
     user = UserSerializer(read_only=True)
     post_count = serializers.SerializerMethodField()
+    is_followed = serializers.SerializerMethodField()
 
     def get_post_count(self, obj):
         post_count = Post.objects.filter(user=obj.user).count()
         return post_count
+
+    def get_is_followed(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            user = request.user
+            return user in obj.followers.all()
+        return False
+
     class Meta:
         model = UserProfile
         exclude = ('followers', 'otp', 'otp_at')

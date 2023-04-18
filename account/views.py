@@ -6,7 +6,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from rest_framework.authentication import BasicAuthentication
 from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, UpdateModelMixin, ListModelMixin
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import IsAdminUser, AllowAny
 from rest_framework.permissions import IsAuthenticated
 from account.serializers import UserRegisterSerializer, UserLogInSerializer, UserChangePasswordSerializer, \
     DeleteUserSerializer, ProfileSerializer, UserSearchSerializer, FollowingSerializer, FollowersSerializer, \
@@ -15,6 +15,8 @@ from account.serializers import UserRegisterSerializer, UserLogInSerializer, Use
 from post.utils import get_tokens_for_user
 from django.contrib.auth.models import User
 from rest_framework.viewsets import GenericViewSet
+
+from .constants import absolute_url
 from .models import UserProfile
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
@@ -28,6 +30,7 @@ class UserRegister(GenericViewSet, CreateModelMixin):
     """View to register user"""
     queryset = User.objects.all()
     serializer_class = UserRegisterSerializer
+    permission_classes = [AllowAny, ]
     http_method_names = ['post']
 
     def create(self, request, *args, **kwargs):
@@ -136,6 +139,7 @@ class UserView(GenericViewSet, ListModelMixin, UpdateModelMixin):
         serializer.save()
         return Response(serializer.data)
 
+
 class ProfileAPI(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixin, mixins.RetrieveModelMixin,
                  mixins.UpdateModelMixin, mixins.DestroyModelMixin):
     serializer_class = ProfileSerializer
@@ -169,8 +173,6 @@ class FollowingViewSet(GenericViewSet, ListModelMixin):
     permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
         profile = UserProfile.objects.get(user=request.user)
         serializer = self.get_serializer(profile)
         return Response(serializer.data)
@@ -195,6 +197,7 @@ class VerifyOTPView(APIView):
 
 class UserSearchView(GenericViewSet):
     serializer_class = UserSearchSerializer
+
     # filter_backends = [filters.SearchFilter]
     # search_fields = ['^username', '^first_name', '^last_name']
 
@@ -241,12 +244,12 @@ class UserFollowView(mixins.CreateModelMixin, GenericViewSet, mixins.DestroyMode
 
         if user_to_follow.userprofile.followers.filter(id=request.user.id).exists():
             user_to_follow.userprofile.followers.remove(request.user)
-            return Response({'message': f'You are no longer following {user_to_follow.username}.'},
-                            status=status.HTTP_204_NO_CONTENT)
+            return Response({'followed': False},
+                            status=status.HTTP_200_OK)
         else:
             user_to_follow.userprofile.followers.add(request.user)
             serializer = self.get_serializer(request.user.userprofile)
-            return Response({'message': f'You are now following {user_to_follow.username}.',
+            return Response({'followed': True,
                              'data': serializer.data}, status=status.HTTP_201_CREATED)
 
 
@@ -309,7 +312,10 @@ class ProfileListView(GenericViewSet, ListModelMixin):
 
     def list(self, request, *args, **kwargs):
         user = self.request.query_params.get('user_id')
-        serializer = ProfileListSerializer(UserProfile.objects.filter(user__id=user), many=True)
+        serializer = ProfileListSerializer(UserProfile.objects.filter(user__id=user), many=True,
+                     context={'request': request})
+        # serializer.data[0]['user']['profile_pic'] = absolute_url+serializer.data[0]['user']['profile_pic']
+        # serializer.data[0]['image'] = absolute_url+serializer.data[0]['image']
         return Response(serializer.data)
 
 
