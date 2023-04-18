@@ -1,10 +1,13 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
+from django.conf import settings
 
+from account.constants import absolute_url
 from account.models import UserProfile
 from post.models import Post, Image, Video, Comment
 
 
+#
 class ImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Image
@@ -61,9 +64,10 @@ class PostSerializers(serializers.ModelSerializer):
     def create(self, validated_data):
         images_data = self.context.get('request').FILES.getlist('images', [])
         videos_data = self.context.get('request').FILES.getlist('videos', [])
+        print(images_data)
 
         post = Post.objects.create(**validated_data, user=self.context['request'].user)
-
+        print(post)
         images = []
         videos = []
 
@@ -77,15 +81,36 @@ class PostSerializers(serializers.ModelSerializer):
             videos.append(video)
         post.videos.set(videos)
 
+        print(post)
+
         return post
 
 
 class PostLikeSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
+    user_profile = UserProfileSerializer(source='user.userprofile', read_only=True)
+    likes_count = serializers.SerializerMethodField()
+    images = ImageSerializer(many=True, required=False)
+    videos = VideoSerializer(many=True, required=False)
+    has_liked = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
         exclude = ['likes', 'comments', 'saved_by']
+
+    def get_has_liked(self, obj) -> bool:
+        return True
+
+    def get_likes_count(self, obj: Post):
+        return obj.likes.count()
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        # absolute_url = settings.BASE_URL  # assuming you have defined the base URL in your settings
+        representation['user_profile']['image'] = absolute_url + str(representation['user_profile']['image'])
+        for image in representation.get('images', []):
+            image['image'] = absolute_url + image['image']
+        return representation
 
 
 class UserFollowersPostSerializer(serializers.ModelSerializer):
@@ -124,6 +149,7 @@ class CommentSerializer(PostSerializers):
 
 
 class PostListSerializer(serializers.ModelSerializer):
+    user_profile = UserProfileSerializer(source='user.userprofile', read_only=True)
     images = ImageSerializer(many=True, required=False)
     videos = VideoSerializer(many=True, required=False)
     user = UserSerializer(read_only=True)
@@ -131,6 +157,14 @@ class PostListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         exclude = ['likes', 'comments', 'saved_by']
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        # absolute_url = settings.BASE_URL  # assuming you have defined the base URL in your settings
+        representation['user_profile']['image'] = absolute_url + str(representation['user_profile']['image'])
+        for image in representation.get('images', []):
+            image['image'] = absolute_url + image['image']
+        return representation
 
 
 class PostSavedSerializer(PostSerializers):
@@ -139,6 +173,7 @@ class PostSavedSerializer(PostSerializers):
 
 
 class PostSaveSerializer(serializers.ModelSerializer):
+    user_profile = UserProfileSerializer(source='user.userprofile', read_only=True)
     images = ImageSerializer(many=True, required=False)
     videos = VideoSerializer(many=True, required=False)
     user = UserSerializer(read_only=True)
@@ -146,6 +181,14 @@ class PostSaveSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         exclude = ['likes', 'comments', 'saved_by']
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        # absolute_url = settings.BASE_URL  # assuming you have defined the base URL in your settings
+        representation['user_profile']['image'] = absolute_url + representation['user_profile']['image']
+        for image in representation.get('images', []):
+            image['image'] = absolute_url + image['image']
+        return representation
 
 
 class PostCommentSerializer(serializers.ModelSerializer):
@@ -158,13 +201,14 @@ class PostCommentSerializer(serializers.ModelSerializer):
 
     def get_comments(self, obj):
         comments = obj.comments.all().values('comment', 'created_at', 'user__username', 'user__userprofile__image')
+        request = self.context.get('request')
         return [
             {
                 'comment': comment['comment'],
                 'created_at': comment['created_at'],
                 'user': {
                     'username': comment['user__username'],
-                    'profile_pic': comment['user__userprofile__image'] if comment[
+                    'profile_pic': absolute_url + "/media/" + comment['user__userprofile__image'] if comment[
                         'user__userprofile__image'] else None
                 }
             }

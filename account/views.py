@@ -1,12 +1,12 @@
 from django.contrib.auth import logout
 from django.db.models import Q
-from rest_framework import serializers, generics, viewsets, mixins, status
+from rest_framework import serializers, generics, viewsets, mixins, status, filters
 from django.shortcuts import get_object_or_404
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from rest_framework.authentication import BasicAuthentication
 from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, UpdateModelMixin, ListModelMixin
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import IsAdminUser, AllowAny
 from rest_framework.permissions import IsAuthenticated
 from account.serializers import UserRegisterSerializer, UserLogInSerializer, UserChangePasswordSerializer, \
     DeleteUserSerializer, ProfileSerializer, UserSearchSerializer, FollowingSerializer, FollowersSerializer, \
@@ -15,6 +15,8 @@ from account.serializers import UserRegisterSerializer, UserLogInSerializer, Use
 from post.utils import get_tokens_for_user
 from django.contrib.auth.models import User
 from rest_framework.viewsets import GenericViewSet
+
+from .constants import absolute_url
 from .models import UserProfile
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
@@ -28,6 +30,7 @@ class UserRegister(GenericViewSet, CreateModelMixin):
     """View to register user"""
     queryset = User.objects.all()
     serializer_class = UserRegisterSerializer
+    permission_classes = [AllowAny, ]
     http_method_names = ['post']
 
     def create(self, request, *args, **kwargs):
@@ -118,7 +121,7 @@ class DeleteUser(GenericViewSet, DestroyModelMixin):
     permission_classes = [IsAdminUser]
 
 
-class UserView(GenericViewSet, ListModelMixin):
+class UserView(GenericViewSet, ListModelMixin, UpdateModelMixin):
     """View to get post of the users followed by user"""
     queryset = User
     serializer_class = UserSerializer
@@ -128,6 +131,13 @@ class UserView(GenericViewSet, ListModelMixin):
         user = self.request.user
         queryset = User.objects.filter(id=user.id)
         return queryset
+
+    def update(self, request, *args, **kwargs):
+        user = request.user
+        serializer = UserSerializer(user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
 
 class ProfileAPI(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixin, mixins.RetrieveModelMixin,
@@ -163,8 +173,6 @@ class FollowingViewSet(GenericViewSet, ListModelMixin):
     permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
         profile = UserProfile.objects.get(user=request.user)
         serializer = self.get_serializer(profile)
         return Response(serializer.data)
@@ -189,6 +197,9 @@ class VerifyOTPView(APIView):
 
 class UserSearchView(GenericViewSet):
     serializer_class = UserSearchSerializer
+
+    # filter_backends = [filters.SearchFilter]
+    # search_fields = ['^username', '^first_name', '^last_name']
 
     def list(self, request, *args, **kwargs):
         search = request.query_params.get('search')
@@ -229,79 +240,17 @@ class UserFollowView(mixins.CreateModelMixin, GenericViewSet, mixins.DestroyMode
             return Response({'error': 'Please enter valid user id'}, status=status.HTTP_400_BAD_REQUEST)
         user_to_follow = get_object_or_404(User, id=user_id)
         if request.user == user_to_follow:
-            return Response({'error': 'You cannot follow himself'}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            profile = user_to_follow.userprofile
-        except UserProfile.DoesNotExist:
-            UserProfile.objects.create(user=user_to_follow)
-        try:
-            profile = self.request.user.userprofile
-        except UserProfile.DoesNotExist:
-            UserProfile.objects.create(user=self.request.user)
-        user_to_follow.userprofile.followers.add(request.user)
-        serializer = self.get_serializer(request.user.userprofile)
-        print(request.user.following.count())
-        return Response({'message': f'now {self.request.user.username} is following {user_to_follow.username}',
-                         'data': serializer.data}, status=status.HTTP_201_CREATED)
+            return Response({'error': 'You cannot follow yourself'}, status=status.HTTP_400_BAD_REQUEST)
 
-    def destroy(self, request, pk=None):
-        user_to_unfollow = get_object_or_404(User, id=pk)
-        user_to_unfollow.userprofile.followers.remove(request.user)
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-
-
-class LogoutViewSet(viewsets.ViewSet):
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def create(self, request):
-        if not request.user.is_authenticated:
-            raise AuthenticationFailed(detail='Authentication credentials were not provided.')
-
-        # delete the user's authentication token
-        Token.objects.filter(user=request.user).delete()
-
-        # return a success response
-        return Response({'detail': 'Successfully logged out.'})
-
-
-# class FollowViewSet(mixins.CreateModelMixin, GenericViewSet, mixins.ListModelMixin, mixins.DestroyModelMixin):
-#     serializer_class = UserFollowSerializer
-#     queryset = User.objects.all()
-#     permission_classes = [IsAuthenticated]
-#
-#     def create(self, request, *args, **kwargs):
-#         user_id = request.data.get('user')
-#         if not user_id:
-#             return Response({'error': 'Please enter valid user id'}, status=status.HTTP_400_BAD_REQUEST)
-#         user_to_follow = get_object_or_404(User, id=user_id)
-#         if request.user == user_to_follow:
-#             return Response({'error': 'You cannot follow himself'}, status=status.HTTP_400_BAD_REQUEST)
-#         try:
-#             profile = user_to_follow.userprofile
-#         except UserProfile.DoesNotExist:
-#             UserProfile.objects.create(user=user_to_follow)
-#
-#         # if request.user.userprofile is None:
-#         #     UserProfile.objects.create(user=self.request.user)
-#         try:
-#             profile = self.request.user.userprofile
-#         except UserProfile.DoesNotExist:
-#             UserProfile.objects.create(user=self.request.user)
-#         profile=UserProfile.objects.get(user=request.user)
-#         user_to_follow.userprofile.followers.add(request.user)
-#         serializer = self.get_serializer(request.user.userprofile)
-#         return Response({'message': f'now {self.request.user.username} is following {user_to_follow.username}',
-#                          'data': serializer.data}, status=status.HTTP_201_CREATED)
-#
-#     def destroy(self, request, pk=None):
-#         user_to_unfollow = get_object_or_404(User, id=pk)
-#         request.user.userprofile.user.following.remove(user_to_unfollow)
-#         user_to_unfollow.userprofile.followers.remove(request.user)
-#         return Response(status=status.HTTP_204_NO_CONTENT)
-
+        if user_to_follow.userprofile.followers.filter(id=request.user.id).exists():
+            user_to_follow.userprofile.followers.remove(request.user)
+            return Response({'followed': False},
+                            status=status.HTTP_200_OK)
+        else:
+            user_to_follow.userprofile.followers.add(request.user)
+            serializer = self.get_serializer(request.user.userprofile)
+            return Response({'followed': True,
+                             'data': serializer.data}, status=status.HTTP_201_CREATED)
 
 
 class ForgotPasswordOTPView(generics.GenericAPIView, mixins.UpdateModelMixin):
@@ -363,7 +312,10 @@ class ProfileListView(GenericViewSet, ListModelMixin):
 
     def list(self, request, *args, **kwargs):
         user = self.request.query_params.get('user_id')
-        serializer = ProfileListSerializer(UserProfile.objects.filter(user__id=user), many=True)
+        serializer = ProfileListSerializer(UserProfile.objects.filter(user__id=user), many=True,
+                     context={'request': request})
+        # serializer.data[0]['user']['profile_pic'] = absolute_url+serializer.data[0]['user']['profile_pic']
+        # serializer.data[0]['image'] = absolute_url+serializer.data[0]['image']
         return Response(serializer.data)
 
 

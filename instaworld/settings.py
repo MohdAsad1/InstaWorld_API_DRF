@@ -33,6 +33,7 @@ ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = [
     'channels',
+    'django_filters',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -89,13 +90,9 @@ ASGI_APPLICATION = 'instaworld.asgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-<<<<<<< Updated upstream
-        'NAME': 'insta_world_db',
-=======
-        'NAME': 'instaworld_db',
->>>>>>> Stashed changes
-        'USER': 'instaworld',
-        'PASSWORD': 'instaworld',
+        'NAME': 'instaworld',
+        'USER': 'postgres',
+        'PASSWORD': 'root',
         'HOST': 'localhost',
         'PORT': 5432,
     }
@@ -107,6 +104,7 @@ REST_FRAMEWORK = {
     # 'EXCEPTION_HANDLER': 'myapp.views.custom_exception_handler',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 12,
+    # 'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
 
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.TokenAuthentication',

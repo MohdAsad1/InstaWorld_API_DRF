@@ -7,6 +7,9 @@ from rest_framework import serializers
 import re
 import sys
 
+from post.models import Post
+from .constants import absolute_url
+
 sys.path.append("..")
 from .models import UserProfile
 
@@ -20,6 +23,8 @@ from account.utility import send_otp, validate_phone_number, send_otp_on_phone
 class UserSerializer(serializers.ModelSerializer):
     """ Serializer for showing post of the follower user follow"""
 
+    profile_pic = serializers.ImageField(source='userprofile.image', read_only=True)
+
     class Meta:
         model = User
         exclude = ['password', 'last_login', 'is_superuser', 'is_staff', 'date_joined', 'groups', 'user_permissions']
@@ -27,10 +32,10 @@ class UserSerializer(serializers.ModelSerializer):
 
 class UserRegisterSerializer(serializers.ModelSerializer):
     """Serializer to Register user"""
-    username = serializers.CharField(trim_whitespace=False)
-    first_name = serializers.CharField(max_length=20, min_length=3, required=True,
+    username = serializers.CharField(trim_whitespace=False, required=True)
+    first_name = serializers.CharField(max_length=20, min_length=2, required=True,
                                        trim_whitespace=False)
-    last_name = serializers.CharField(max_length=20, min_length=3, required=True,
+    last_name = serializers.CharField(max_length=20, min_length=2, required=True,
                                       trim_whitespace=False)
 
     password = serializers.CharField(max_length=20, min_length=8, required=True,
@@ -52,19 +57,14 @@ class UserRegisterSerializer(serializers.ModelSerializer):
                                               "and no spaces.")
         return value
 
-    # def validate_username(self, value):
-    #     if not value.isalnum() or ' ' in value:
-    #         raise serializers.ValidationError(" Username should contain alphanumeric value and spaces not allowed")
-    #     if not any(char.isalpha() for char in value):
-    #         raise serializers.ValidationError("Username should contain atleast one alphabet.")
-    #     return value
-
     def validate_username(self, value):
         if any(char not in string.ascii_letters + string.digits + string.punctuation for char in value):
             raise serializers.ValidationError(
                 "Username should contain alphanumeric characters and special characters only.")
         if not any(char.isalpha() for char in value):
             raise serializers.ValidationError("Username should contain at least one alphabet.")
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("Username already exist")
         return value
 
     def validate_first_name(self, value):
@@ -141,9 +141,6 @@ class DeleteUserSerializer(serializers.ModelSerializer):
 
 
 class UserSearchSerializer(serializers.ModelSerializer):
-    """
-    Serializer for showing post of the follower user follow
-    """
     profile_pic = serializers.ImageField(source='userprofile.image', read_only=True)
 
     class Meta:
@@ -179,20 +176,25 @@ class FollowersSerializer(serializers.ModelSerializer):
         fields = ('followers',)
 
     def get_followers(self, obj):
-        return [{'id': user.id, 'username': user.username, 'profile': {'profile_pic': str(user.userprofile.image)}}
+        request = self.context.get('request')
+        return [{'id': user.id, 'username': user.username,
+                 'profile': {'profile_pic': absolute_url + "/media/" + str(user.userprofile.image)}}
                 for user in obj.followers.all()]
 
 
 class FollowingSerializer(serializers.ModelSerializer):
     following = serializers.SerializerMethodField()
 
-    def get_following(self, obj):
-        return [{'id': user.id, 'username': user.username, 'profile': {'profile_pic': str(user.userprofile.image)}}
-                for user in obj.user.following.all()]
-
     class Meta:
         model = UserProfile
         fields = ('following',)
+
+    def get_following(self, obj):
+        current_user = obj.user
+        request = self.context.get('request')
+        return [{'id': profile.user.id, 'username': profile.user.username,
+                 'profile': {'profile_pic': absolute_url + "/media/" + str(profile.image)}}
+                for profile in current_user.following.all()]
 
 
 User = get_user_model()
@@ -291,9 +293,15 @@ class ProfileFollowerSerializer(serializers.ModelSerializer):
 class UserFollowSerializer(serializers.ModelSerializer):
     following = serializers.SerializerMethodField()
 
+    # has_follow = serializers.SerializerMethodField()
+
     class Meta:
         model = UserProfile
         fields = ('user', 'following')
+
+    # def get_has_follow(self, obj):
+    #     user = self.context['request'].user
+    #     return user.is_authenticated and user.following.filter(pk=obj.id).exists()
 
     def get_following(self, obj):
         user_followings = ProfileFollowerSerializer(obj.user.following.all(), many=True)
@@ -312,7 +320,6 @@ class TokenSerializer(serializers.Serializer):
 #     class Meta:
 #         model = UserProfile
 #         fields = ('user', 'followers')
-
 
 
 class ForgotPasswordOTPSerializer(serializers.ModelSerializer):
@@ -387,11 +394,18 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 class ProfileListSerializer(ProfileSerializer):
     user = UserSerializer(read_only=True)
-    post_count = serializers.SerializerMethodField()
+    is_followed = serializers.SerializerMethodField()
 
     def get_post_count(self, obj):
         post_count = Post.objects.filter(user=obj.user).count()
         return post_count
+
+    def get_is_followed(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            user = request.user
+            return user in obj.followers.all()
+        return False
 
     class Meta:
         model = UserProfile

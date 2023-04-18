@@ -5,7 +5,7 @@ from account import views
 from rest_framework.routers import DefaultRouter
 
 from account.views import VerifyOTPView, ProfileAPI, GenerateOTPView, ForgotPasswordOTPView, \
-    UserProfileIdView, ForgotPassword, UserLogoutView
+    UserProfileIdView, UserLogoutView
 
 router = DefaultRouter()
 
@@ -18,8 +18,8 @@ router.register(r'search-user', views.UserSearchView, basename='search_user'),
 router.register(r'profile', ProfileAPI, basename='profile'),
 router.register(r'follow', views.UserFollowView, basename='follow'),
 router.register('get_followers_list', views.FollowerViewSet, basename='get_followers_list'),
-router.register('get_following_list', views.FollowingViewSet, basename='get_following_list'),
-router.register('forgot_password', ForgotPassword, basename='forgot_password'),
+router.register(r'get_following_list', views.FollowingViewSet, basename='get_following_list')
+router.register('forgot_password', views.ForgotPassword, basename='forgot_password'),
 router.register('particular_user_profile', views.ProfileListView, basename='particular_user_profile'),
 router.register('refresh_token', views.TokenRefreshViewset, basename='refresh_token'),
 
