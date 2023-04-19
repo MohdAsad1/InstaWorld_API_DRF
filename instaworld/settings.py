@@ -90,14 +90,13 @@ ASGI_APPLICATION = 'instaworld.asgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'instaworld',
-        'USER': 'postgres',
-        'PASSWORD': 'root',
+        'NAME': 'insta_world_db',
+        'USER': 'instaworld',
+        'PASSWORD': 'instaworld',
         'HOST': 'localhost',
         'PORT': 5432,
     }
 }
-
 
 REST_FRAMEWORK = {
     'AUTHENTICATION_CLASSES': 'rest_framework.authentication.TokenAuthentication',

@@ -28,3 +28,4 @@ def send_otp_on_phone(self, phone_number, otp):
     message = f'Your OTP is: {otp}'
     verification = client.messages.create(from_=twilio_phone_number, to=phone_number, body=message)
     print(verification.status)
+
